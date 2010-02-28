@@ -33,6 +33,7 @@ $reverse = false
 class Directory
   attr_reader :dir
   attr_accessor :cur
+  attr_accessor :parent
 
   def initialize(dir)
     @dir = dir
@@ -229,7 +230,9 @@ class FileItem
 
   def activate
     if directory?
-      cd path
+      prev_active = $active
+      $columns.push($active = Directory.new(path))
+      $active.parent = prev_active
     else
       Curses.close_screen
       system "less", path
@@ -256,17 +259,13 @@ def cd(dir)
   d = "/"
   prev_columns = $columns
 
-  $columns = []
-  dir.squeeze('/').split('/').each { |part|
-    $columns << Directory.new(d)
-    $columns.last.select part
-    
-    d += '/' << part
+  $columns = [$active = Directory.new("/")]
+  $active.parent = $active
+  dir.split('/').each { |part|
+    next  if part.empty?
+    $active.select part
+    $active.sel.activate
   }
-  $columns << Directory.new(d)
-
-  $active = $columns.last
-  $columns << Sidebar.new  if $sidebar
 
   if col = prev_columns.find { |c| Directory === c && c.dir == $active.dir }
     $active.cur = col.cur
@@ -316,7 +315,12 @@ def draw
   Curses.setpos(Curses.lines-1, 0)
   Curses.addstr "colfm - #$sort " << `ls -ldhi #{sel}`
 
-  total = 0
+  if $sidebar
+    sidebar = Sidebar.new
+    total = sidebar.width
+  else
+    total = 0
+  end
   cols = 0
   $columns.reverse_each { |c|
     total += c.width+1
@@ -331,6 +335,8 @@ def draw
     col.draw(x)
     x += col.width + 1
   }
+
+  sidebar.draw(x)  if $sidebar
 end
 
 def rtrunc(str, width)
@@ -428,7 +434,9 @@ begin
       $backup = !$backup
       refresh
     when ?h, Curses::KEY_LEFT
-      cd($pwd.split("/")[0...-1].join("/"))
+      prev_active = $active
+      $active = $active.parent
+      $columns.delete prev_active  unless prev_active == $active
     when ?j, Curses::KEY_DOWN
       $active.cursor 1
     when ?k, Curses::KEY_UP
