@@ -4,7 +4,6 @@ require 'pp'
 
 =begin
 TODO:
-- isearching for paths
 - select multiple files, and operate on them
 - compressed files?
 - a bar on the left that shows favorites and /
@@ -179,6 +178,68 @@ def cursor(offset)
   $active[$active.size-1] = [[a + offset, 0].max, $columns[$active.size - 1].size - 1].min
 end
 
+def isearch
+  str = ""
+  c = nil
+  orig = $active[$active.size-1]
+  
+  loop {
+    draw
+    
+    Curses.setpos(Curses.lines-1, 0)
+    Curses.addstr "colfm - #$sort - #{c} I-Search: " << str
+    Curses.clrtoeol
+    Curses.refresh
+    
+    case c = Curses.getch
+    when ?/
+      sel = $columns[$active.size-1][$active.last]
+      if sel[2] && sel[2].directory?
+        cd $sel
+      end
+      str = ""
+      c = nil
+      orig = $active[$active.size-1]
+      
+    when 040..0176
+      str << c
+    when 0177                   # delete
+      if str.empty?
+        $active[$active.size-1] = orig
+        break
+      end
+      str = str[0...-1]
+    when 033, Curses::KEY_CTRL_C, Curses::KEY_CTRL_G
+      $active[$active.size-1] = orig
+      break
+    when Curses::KEY_CTRL_W
+      str.gsub!(/\A(.*)\S*\z/, '\1')
+    when Curses::KEY_CTRL_U
+      str = ""
+    else
+      break
+    end
+    
+    if str == ".."
+      cd($pwd.split("/")[0...-1].join("/"))
+      str = ""
+      c = nil
+      orig = $active[$active.size-1]
+    end
+    
+    $active[$active.size-1] = cur = orig
+    looped = false
+    begin
+      until $columns[$active.size-1][$active.last][0] =~ Regexp.new(str) ||
+          ($active[$active.size-1] == cur && looped)
+        $active[$active.size-1] = ($active[$active.size-1] + 1) % ($columns[$active.size-1].size)
+        looped = true
+      end
+    rescue RegexpError
+    end
+  }        
+end
+
 begin
   if File.directory?(ARGV.first)
     cd ARGV.first
@@ -224,7 +285,12 @@ begin
     when ?s
       $sort = $sort%6 + 1
       refresh
-    when ?l, Curses::KEY_RIGHT     
+    when ?/
+      isearch
+      draw
+      Curses.refresh
+
+    when ?l, Curses::KEY_RIGHT, ?\r
       sel = $columns[$active.size-1][$active.last]
       if sel[2] && sel[2].directory?
         cd $sel
