@@ -8,7 +8,6 @@ TODO:
 - compressed files?
 - a bar on the left that shows favorites and /
 - last column more detailed?
-- a preview/more information panel in last column
 - bring selected directory/files back to shell
 =end
 
@@ -18,12 +17,16 @@ $active = []
 
 $dotfiles = false
 $backup = true
+$sidebar = false
+
+$marked = []
 
 $pwd = ""
 
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
 MAX_LAST_COL_WIDTH = 35
+SIDEBAR_MIN_WIDTH = 20
 
 $sort = 1
 $reverse = false
@@ -106,10 +109,12 @@ def draw
   max_x, max_y = Curses.cols, Curses.lines-5
 
   sel = $columns[$active.size-1][$active.last][1]
+  Curses.setpos(Curses.lines-2, 0)
+  Curses.addstr "[" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
   Curses.addstr "colfm - #$sort " << `ls -ldhi #{sel}`
 
-  total = 0
+  total = $sidebar ? SIDEBAR_MIN_WIDTH : 0
   cols = 0
   $colwidth.reverse_each { |w|
     total += w+1
@@ -129,10 +134,37 @@ def draw
 
       Curses.setpos(j+y-skiplines, x)
       Curses.standout  if j == act
+      Curses.attron(Curses::A_BOLD)  if $marked.include? entry[1]
       Curses.addstr fmt(entry, $colwidth[i])
+      Curses.attroff(Curses::A_BOLD)  if $marked.include? entry[1]
       Curses.standend  if j == act
     }
     x += $colwidth[i] + 1
+  }
+
+  draw_sidebar(x)  if $sidebar
+end
+
+def draw_sidebar(x)
+  sel = $columns[$active.size-1][$active.last]
+  
+  width = Curses.cols - x - 1
+
+  header = sel[0]
+  if sel[2].file?
+    header = File.open(sel[1]) { |f| f.read(1024) }
+    header.tr!("^\n \041-\176", '.')
+    File.open("/tmp/dbg", "w") { |w| w<< header }
+    #   header.gsub!(/.{#{width}}/, "\\&\n")
+  elsif sel[2].directory?
+    #   header = `du -sh #{sel[1]}`
+  end
+  
+  y = 2
+  header.each_line { |l|
+    Curses.setpos(y, x)
+    Curses.addstr l[0..width]
+    y += 1
   }
 end
 
@@ -278,6 +310,9 @@ begin
       $active[$active.size-1] = 0
     when ?G, Curses::KEY_END
       $active[$active.size-1] = $columns[$active.size-1].size-1
+    when ?v
+      $sidebar = !$sidebar
+      refresh
     when ?S
       $reverse = !$reverse
       refresh
@@ -288,7 +323,6 @@ begin
       isearch
       draw
       Curses.refresh
-
     when ?l, Curses::KEY_RIGHT, ?\r
       sel = $columns[$active.size-1][$active.last]
       if sel[3] && sel[3].directory?
@@ -297,6 +331,15 @@ begin
         Curses.close_screen
         system "less", sel[1]
         Curses.refresh
+      end
+    when ?C
+      $marked.clear
+    when ?m, ?\s
+      sel = $columns[$active.size-1][$active.last][1]
+      if $marked.include? sel
+        $marked -= [sel]
+      else
+        $marked << sel
       end
     end
   }
