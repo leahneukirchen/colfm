@@ -5,7 +5,6 @@ require 'pp'
 =begin
 TODO:
 - parse ARGV
-- pgup/pgdown
 - isearching for paths
 - more status info (size, owner etc.)
 - sorting
@@ -149,20 +148,29 @@ begin
   Curses.nonl
   Curses.cbreak
   Curses.noecho
+  Curses.stdscr.keypad true
 
   loop {
     draw
     
-    case Curses.getch.chr
-    when "q"
+    case Curses.getch
+    when ?q
       break
-    when "h"
+    when ?h, Curses::KEY_LEFT
       cd($pwd.split("/")[0...-1].join("/"))
-    when "j"
+    when ?j, Curses::KEY_DOWN
       cursor 1
-    when "k"
+    when ?k, Curses::KEY_UP
       cursor -1
-    when "l"
+    when ?J, Curses::KEY_NPAGE
+      cursor Curses.lines/2
+    when ?K, Curses::KEY_PPAGE
+      cursor -Curses.lines/2
+    when ?g, Curses::KEY_HOME
+      $active[$active.size-1] = 0
+    when ?G, Curses::KEY_END
+      $active[$active.size-1] = $columns[$active.size-1].size-1
+    when ?l, Curses::KEY_RIGHT     
       sel = $columns[$active.size-1][$active.last]
       if sel[1] == "/"
         cd $sel
