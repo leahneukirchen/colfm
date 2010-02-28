@@ -5,6 +5,7 @@ require 'pp'
 =begin
 TODO:
 - select multiple files, and operate on them
+- select files by regexp (%)
 - compressed files?
 - a bar on the left that shows favorites and /
 - last column more detailed?
@@ -100,7 +101,11 @@ def refresh
 end
 
 def draw
-  Curses.clear
+  0.upto(Curses.cols) { |i|
+    Curses.setpos(i,0)
+    Curses.clrtoeol
+  }
+
   Curses.setpos(0, 0)
   Curses.addstr $pwd
 
