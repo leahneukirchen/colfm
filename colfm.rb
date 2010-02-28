@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 require 'curses'
 require 'pp'
 
@@ -6,12 +7,12 @@ TODO:
 - parse ARGV
 - pgup/pgdown
 - isearching for paths
-- shor...ten paths
 - more status info (size, owner etc.)
 - sorting
 - hide backup~, show .dotfiles
 - select multiple files, and operate on them
 - compressed files?
+- a bar on the left that shows favorites and /
 =end
 
 $columns = []
@@ -53,7 +54,7 @@ def cd(dir)
       end
     }
 
-    maxwidth = entries.map { |(f, t)| f.size }.max
+    maxwidth = entries.map { |(f, t)| f.size }.max + 1
 
     $columns << entries
     $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
@@ -82,12 +83,12 @@ def draw
   x = 0
   y = 2
 
-  max_x, max_y = Curses.cols, Curses.lines-4
+  max_x, max_y = Curses.cols, Curses.lines-5
 
   update_status
 
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - " << $sel
+  Curses.addstr "colfm - " << rtrunc($sel, 50)
 
   total = 0
   cols = 0
@@ -117,7 +118,23 @@ def draw
 end
 
 def fmt(entry, width)
-  (entry[0] + entry[1])[0,width].ljust(width)
+  trunc(entry[0] + entry[1], width).ljust(width)
+end
+
+def trunc(str, width)
+  if str.size > width
+    str[0, 2*width/3] + "*" + str[-(width/3)..-1]
+  else
+    str
+  end
+end
+
+def rtrunc(str, width)
+  if str.size > width
+    "..." + str[-width..-1]
+  else
+    str
+  end
 end
 
 begin
