@@ -87,11 +87,6 @@ class Directory
     @cur = @entries.size-1
   end
 
-  # XXX remove
-  def each_with_index(&blk)
-    @entries.each_with_index(&blk)
-  end
-
   def select(name)
     @entries.each_with_index { |e, i|
       @cur = i
@@ -99,11 +94,28 @@ class Directory
     }
     @cur = 0
   end
+
+  def draw(x)
+    max_y = Curses.lines - 5
+    skiplines = [0, cur - max_y + 1].max
+    
+    @entries.each_with_index { |entry, j|
+      next  if j < skiplines
+      break  if j-skiplines > max_y
+      
+      Curses.setpos(j+2-skiplines, x)
+      Curses.standout  if j == @cur
+      Curses.attron(Curses::A_BOLD)  if entry.marked?
+      Curses.addstr entry.format(width, active?)
+      Curses.attroff(Curses::A_BOLD)  if entry.marked?
+      Curses.standend  if j == @cur
+    }
+  end
 end
 
 class EmptyItem
   def width
-    10
+    0
   end
 
   def format(width, detail)
@@ -115,6 +127,10 @@ class EmptyItem
 
   def marked?
     false
+  end
+
+  def preview
+    ""
   end
 end
 
@@ -180,6 +196,10 @@ class FileItem
     @stat.directory?
   end
 
+  def file?
+    @stat.file?
+  end
+
   def symlink?
     @lstat.symlink?
   end
@@ -216,6 +236,20 @@ class FileItem
       Curses.refresh
     end
   end
+
+  def preview
+    if directory?
+      "Directory #@name\n\n#{Dir.entries(@path).size} files"
+    elsif file?
+      header = File.open(@path) { |f| f.read(1024) }
+      header.tr!("^\n \041-\176", '.')
+      header
+    else
+      "No preview defined for #@name."
+    end
+  rescue
+    "Can't read #@name:\n#$!"
+  end
 end
 
 def cd(dir)
@@ -232,9 +266,9 @@ def cd(dir)
   $columns << Directory.new(d)
 
   $active = $columns.last
-#XXX  $columns << Sidebar.new  if $sidebar
+  $columns << Sidebar.new  if $sidebar
 
-  if col = prev_columns.find { |c| c.dir == $active.dir }
+  if col = prev_columns.find { |c| Directory === c && c.dir == $active.dir }
     $active.cur = col.cur
   end
 
@@ -244,6 +278,20 @@ end
 class Sidebar
   def width
     SIDEBAR_MIN_WIDTH
+  end
+
+  def draw(x)
+    # The sidebar may use the full width left over.
+    width = Curses.cols - x - 1
+    
+    header = $active.sel.preview.to_s
+    
+    y = 2
+    header.each_line { |l|
+      Curses.setpos(y, x)
+      Curses.addstr l[0..width]
+      y += 1
+    }
   end
 end
 
@@ -259,9 +307,6 @@ def draw
 
   Curses.setpos(0, 0)
   Curses.addstr $pwd
-
-  x = 0
-  y = 2
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
@@ -280,46 +325,11 @@ def draw
   }
   skipcols = $columns.size - cols
 
-  skiplines = [0, $active.cur - max_y + 1].max
-
-  $columns.each_with_index { |col, i|
-    next  if i < skipcols
-
-    $columns[i].each_with_index { |entry, j|
-      next  if j < skiplines
-      break  if j-skiplines > max_y
-
-      Curses.setpos(j+y-skiplines, x)
-      Curses.standout  if j == col.cur
-      Curses.attron(Curses::A_BOLD)  if entry.marked?
-      Curses.addstr entry.format(col.width, col == $active)
-      Curses.attroff(Curses::A_BOLD)  if entry.marked?
-      Curses.standend  if j == col.cur
-    }
+  x = 0
+  $columns.each_with_index { |col, c|
+    next  if c < skipcols
+    col.draw(x)
     x += col.width + 1
-  }
-end
-
-def draw_sidebar(x)
-  sel = $columns[$active.size-1][$active.last]
-  
-  width = Curses.cols - x - 1
-
-  header = sel[0]
-  if sel[2].file?
-    header = File.open(sel[1]) { |f| f.read(1024) }
-    header.tr!("^\n \041-\176", '.')
-    File.open("/tmp/dbg", "w") { |w| w<< header }
-    #   header.gsub!(/.{#{width}}/, "\\&\n")
-  elsif sel[2].directory?
-    #   header = `du -sh #{sel[1]}`
-  end
-  
-  y = 2
-  header.each_line { |l|
-    Curses.setpos(y, x)
-    Curses.addstr l[0..width]
-    y += 1
   }
 end
 
