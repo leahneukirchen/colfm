@@ -7,6 +7,8 @@ TODO:
 - select multiple files, and operate on them
 - compressed files?
 - a bar on the left that shows favorites and /
+- last column more detailed?
+- a preview/more information panel in last column
 =end
 
 $columns = []
@@ -241,7 +243,7 @@ def isearch
 end
 
 begin
-  if File.directory?(ARGV.first)
+  if ARGV.first && File.directory?(ARGV.first)
     cd ARGV.first
   else
     cd Dir.pwd
