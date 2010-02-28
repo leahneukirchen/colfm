@@ -4,7 +4,6 @@ require 'pp'
 
 =begin
 TODO:
-- parse ARGV
 - isearching for paths
 - sorting
 - select multiple files, and operate on them
@@ -158,7 +157,11 @@ def cursor(offset)
 end
 
 begin
-  cd Dir.pwd
+  if File.directory?(ARGV.first)
+    cd ARGV.first
+  else
+    cd Dir.pwd
+  end
 
   Curses.init_screen
   Curses.nonl
