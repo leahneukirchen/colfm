@@ -137,6 +137,11 @@ def rtrunc(str, width)
   end
 end
 
+def cursor(offset)
+  a = $active.last
+  $active[$active.size-1] = [[a + offset, 0].max, $columns[$active.size - 1].size - 1].min
+end
+
 begin
   cd Dir.pwd
 
@@ -154,9 +159,9 @@ begin
     when "h"
       cd($pwd.split("/")[0...-1].join("/"))
     when "j"
-      $active[$active.size - 1] = [$active[$active.size - 1] + 1, $columns[$active.size - 1].size - 1].min
+      cursor 1
     when "k"
-      $active[$active.size - 1] = [$active[$active.size - 1] - 1, 0].max
+      cursor -1
     when "l"
       sel = $columns[$active.size-1][$active.last]
       if sel[1] == "/"
