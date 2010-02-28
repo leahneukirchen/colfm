@@ -9,6 +9,7 @@ TODO:
 - a bar on the left that shows favorites and /
 - last column more detailed?
 - a preview/more information panel in last column
+- bring selected directory/files back to shell
 =end
 
 $columns = []
@@ -26,7 +27,7 @@ MAX_LAST_COL_WIDTH = 35
 
 $sort = 1
 $reverse = false
-def sortkey(f,l,s)
+def sortkey(f,n,l,s)
   return []  unless l
 
   case $sort
@@ -54,29 +55,30 @@ def cd(dir)
   $colwidth = []
   $active = []
 
-  parts = (dir + "/*").split('/')[1..-1]
+  parts = (dir.squeeze('/') + "/*").split('/')[1..-1]
   parts.each_with_index { |part, j|
     entries = Dir.entries(d).
     delete_if { |f| f =~ /^\./ && !$dotfiles }.
     delete_if { |f| f =~ /~\z/ && !$backup }.
     map { |f|
-      [f, File.lstat(d + "/" + f), File.stat(d + "/" + f)]
-    }.sort_by { |f, l, s|
-      sortkey(f, l, s)
+      [f, d + "/" + f, File.lstat(d + "/" + f), File.stat(d + "/" + f)]
+    }.sort_by { |f, n, l, s|
+      sortkey(f, n, l, s)
     }
     entries = entries.reverse  if $reverse
 
-    entries.each_with_index { |(f, l, s), i|
+    entries.each_with_index { |(f, n, l, s), i|
       if f == part
         $active << i
       end
     }
 
-    maxwidth = (entries.map { |(f, l, s)| f.size }.max || 0) + 1
+    maxwidth = (entries.map { |(f, n, l, s)| f.size }.max || 0) + 1
 
     $columns << entries
     $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
                   j < parts.size-1 ? MAX_COL_WIDTH : MAX_LAST_COL_WIDTH].min
+    d = ""  if d == "/"
     d << "/" << part
   }
 
@@ -93,10 +95,6 @@ def refresh
   cd($pwd)
 end
 
-def update_sel
-  $sel = $pwd + "/" + $columns[$active.size-1][$active.last][0]
-end
-
 def draw
   Curses.clear
   Curses.setpos(0, 0)
@@ -107,10 +105,9 @@ def draw
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
-  update_sel
-
+  sel = $columns[$active.size-1][$active.last][1]
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - #$sort " << `ls -ldhi #$sel`
+  Curses.addstr "colfm - #$sort " << `ls -ldhi #{sel}`
 
   total = 0
   cols = 0
@@ -140,7 +137,7 @@ def draw
 end
 
 def fmt(entry, width)
-  file, lstat, stat = entry
+  file, full, lstat, stat = entry
   return "-- empty --".ljust(width)  if lstat.nil?
 
   if lstat.symlink?
@@ -196,8 +193,8 @@ def isearch
     case c = Curses.getch
     when ?/
       sel = $columns[$active.size-1][$active.last]
-      if sel[2] && sel[2].directory?
-        cd $sel
+      if sel[3] && sel[3].directory?
+        cd sel[1]
       end
       str = ""
       c = nil
@@ -294,11 +291,11 @@ begin
 
     when ?l, Curses::KEY_RIGHT, ?\r
       sel = $columns[$active.size-1][$active.last]
-      if sel[2] && sel[2].directory?
-        cd $sel
+      if sel[3] && sel[3].directory?
+        cd sel[1]
       else
         Curses.close_screen
-        system "less", $sel
+        system "less", sel[1]
         Curses.refresh
       end
     end
