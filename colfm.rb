@@ -1,12 +1,28 @@
 require 'curses'
+require 'pp'
 
-$columns = Dir.pwd.split('/')
+=begin
+TODO:
+- parse ARGV
+- special wide last column
+- pgup/pgdown
+- isearching for paths
+- shor...ten paths
+- more status info (size, owner etc.)
+- sorting
+- hide backup~, show .dotfiles
+- select multiple files, and operate on them
+- compressed files?
+=end
 
-$active = [0] * $columns.size
+$columns = []
+$colwidth = []
+$active = []
 
 $pwd = ""
 
-COL_WIDTH = 10
+MIN_COL_WIDTH = 8
+MAX_COL_WIDTH = 20
 
 def cd(dir)
   d = "/"
@@ -14,10 +30,11 @@ def cd(dir)
   prev_active = $active.dup
 
   $columns = []
+  $colwidth = []
   $active = []
 
   (dir + "/*").split('/')[1..-1].each { |part|
-    $columns << Dir.entries(d).delete_if { |f| f =~ /^\./ }.map { |f|
+    entries = Dir.entries(d).delete_if { |f| f =~ /^\./ }.map { |f|
       [f, if File.directory?(d + "/" + f)
             "/"
           elsif File.executable?(d + "/" + f)
@@ -29,12 +46,16 @@ def cd(dir)
       [t == "/" ? 0 : 1, f]
     }
 
-    $columns.last.each_with_index { |(f, t), i|
+    entries.each_with_index { |(f, t), i|
       if f == part
         $active << i
       end
     }
 
+    maxwidth = entries.map { |(f, t)| f.size }.max
+
+    $columns << entries
+    $colwidth << [[MIN_COL_WIDTH, maxwidth].max, MAX_COL_WIDTH].min
     d << "/" << part
   }
 
@@ -47,32 +68,63 @@ def cd(dir)
   $pwd = dir
 end
 
+def update_status
+  $sel = $pwd + "/" + $columns[$active.size-1][$active.last][0]
+end
+
 def draw
   Curses.clear
   Curses.setpos(0, 0)
   Curses.addstr $pwd
 
+  x = 0
+  y = 2
+
+  max_x, max_y = Curses.cols, Curses.lines-4
+
+  update_status
+
+  Curses.setpos(Curses.lines-1, 0)
+  Curses.addstr "colfm - " << $sel
+
+  total = 0
+  cols = 0
+  $colwidth.reverse_each { |w|
+    total += w+1
+    break  if total > max_x
+    cols += 1
+  }
+  skipcols = $columns.size - cols
+
+  skiplines = [0, $active.last - max_y + 1].max
+
   $active.each_with_index { |act, i|
+    next  if i < skipcols
+
     $columns[i].each_with_index { |entry, j|
-      Curses.setpos(j+2, i*COL_WIDTH)
+      next  if j < skiplines
+      break  if j-skiplines > max_y
+
+      Curses.setpos(j+y-skiplines, x)
       Curses.standout  if j == act
-      Curses.addstr fmt(entry)
+      Curses.addstr fmt(entry, $colwidth[i])
       Curses.standend  if j == act
     }
+    x += $colwidth[i] + 1
   }
 end
 
-def fmt(entry)
-  (entry[0][0,COL_WIDTH-2] + entry[1]).ljust(COL_WIDTH-1)
+def fmt(entry, width)
+  (entry[0] + entry[1])[0,width].ljust(width)
 end
 
 begin
+  cd Dir.pwd
+
   Curses.init_screen
   Curses.nonl
   Curses.cbreak
   Curses.noecho
-
-  cd Dir.pwd
 
   loop {
     draw
@@ -89,9 +141,9 @@ begin
     when "l"
       sel = $columns[$active.size-1][$active.last]
       if sel[1] == "/"
-        cd(($pwd.split("/") << sel[0]).join("/"))
+        cd $sel
       else
-        system "less", $pwd + "/" + sel[0]
+        system "less", $sel
       end
     end
   }
