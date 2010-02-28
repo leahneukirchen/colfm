@@ -12,13 +12,11 @@ TODO:
 - bring selected directory/files back to shell
 =end
 
-$columns = []
-$colwidth = []
-$active = []
-
 $dotfiles = false
 $backup = true
 $sidebar = false
+
+$columns = []
 
 $marked = []
 
@@ -26,74 +24,227 @@ $pwd = ""
 
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
-MAX_LAST_COL_WIDTH = 35
+MAX_ACTIVE_COL_WIDTH = 35
 SIDEBAR_MIN_WIDTH = 20
 
 $sort = 1
 $reverse = false
-def sortkey(f,n,l,s)
-  return []  unless l
 
-  case $sort
-  when 1 # name
-    [s.directory? ? 0 : 1, f]
-  when 2 # extension
-    [s.directory? ? 0 : 1, f.split('.').last]
-  when 3 # size
-    [s.directory? ? 0 : 1, s.size]
-  when 4 # atime
-    [s.atime]
-  when 5 # ctime
-    [s.ctime]
-  when 6 # mtime
-    [s.mtime]
+class Directory
+  attr_reader :dir
+  attr_accessor :cur
+
+  def initialize(dir)
+    @dir = dir
+    @cur = 0
+
+    refresh
+  end
+
+  def active?
+    $active == self
+  end
+
+  def refresh
+    @entries = Dir.entries(@dir).
+    delete_if { |f| f =~ /^\./ && !$dotfiles }.
+    delete_if { |f| f =~ /~\z/ && !$backup }.
+    map { |f|
+      FileItem.new(File.join(@dir, f))
+    }.sort_by { |f|
+      f.sortkey
+    }
+    @entries.reverse!  if $reverse
+
+    if @entries.empty?
+      @entries = [EmptyItem.new]
+    end
+  end
+
+  def width
+    [[MIN_COL_WIDTH, (@entries.map { |e| e.width }.max || 0)].max,
+     active? ? MAX_ACTIVE_COL_WIDTH : MAX_COL_WIDTH].min +
+      (active? ? 5 : 0)
+  end
+
+  def sel
+    @entries[@cur]
+  end
+
+  def cursor(offset)
+    @cur = [[@cur + offset, 0].max, @entries.size-1].min
+  end
+
+  def next
+    @cur = (@cur+1) % @entries.size
+  end
+
+  def first
+    @cur = 0
+  end
+
+  def last
+    @cur = @entries.size-1
+  end
+
+  # XXX remove
+  def each_with_index(&blk)
+    @entries.each_with_index(&blk)
+  end
+
+  def select(name)
+    @entries.each_with_index { |e, i|
+      @cur = i
+      return  if e.name == name
+    }
+    @cur = 0
+  end
+end
+
+class EmptyItem
+  def width
+    10
+  end
+
+  def format(width, detail)
+    "-- empty --".ljust(width)
+  end
+
+  def activate
+  end
+
+  def marked?
+    false
+  end
+end
+
+class FileItem
+  attr_reader :path, :name
+
+  def initialize(path)
+    @path = path
+
+    refresh
+  end
+
+  def refresh
+    @name = File.basename @path
+    @lstat = File.lstat @path
+    @stat = File.stat @path
+  end
+
+  def marked?
+    $marked.include? @path
+  end
+
+  def format(width, detail)
+    if @lstat.symlink?
+      sigil = "@"
+    elsif @stat.directory?
+      sigil = "/"
+    elsif @stat.executable?
+      sigil = "*"
+    elsif @stat.socket?
+      sigil = "="
+    elsif @stat.pipe?
+      sigil = "|"
+    else
+      sigil = ""
+    end
+    
+    if detail && !directory?
+      trunc(@name+sigil, width-5).ljust(width - 5) + "%5s" % human(@stat.size)
+    else
+      trunc(@name+sigil, width).ljust(width)
+    end
+  end
+  
+  def trunc(str, width)
+    if str.size > width
+      str[0, 2*width/3] + "*" + str[-(width/3)..-1]
+    else
+      str
+    end
+  end
+
+  def human(size)
+    units = %w{B K M G T P E Z Y}
+    until size < 1024
+      units.shift
+      size /= 1024.0
+    end
+    "%d%s" % [size, units.first]
+  end
+
+  def directory?
+    @stat.directory?
+  end
+
+  def symlink?
+    @lstat.symlink?
+  end
+
+  def sortkey
+    return []  unless @lstat
+    
+    case $sort
+    when 1 # name
+      [directory? ? 0 : 1, @name]
+    when 2 # extension
+      [directory? ? 0 : 1, @name.split('.').last]
+    when 3 # size
+      [directory? ? 0 : 1, @stat.size]
+    when 4 # atime
+      [@stat.atime]
+    when 5 # ctime
+      [@stat.ctime]
+    when 6 # mtime
+      [@stat.mtime]
+    end
+  end
+
+  def width
+    @name.size + 1
+  end
+
+  def activate
+    if directory?
+      cd path
+    else
+      Curses.close_screen
+      system "less", path
+      Curses.refresh
+    end
   end
 end
 
 def cd(dir)
   d = "/"
-
-  prev_active = $active.dup
+  prev_columns = $columns
 
   $columns = []
-  $colwidth = []
-  $active = []
-
-  parts = (dir.squeeze('/') + "/*").split('/')[1..-1]
-  parts.each_with_index { |part, j|
-    entries = Dir.entries(d).
-    delete_if { |f| f =~ /^\./ && !$dotfiles }.
-    delete_if { |f| f =~ /~\z/ && !$backup }.
-    map { |f|
-      [f, d + "/" + f, File.lstat(d + "/" + f), File.stat(d + "/" + f)]
-    }.sort_by { |f, n, l, s|
-      sortkey(f, n, l, s)
-    }
-    entries = entries.reverse  if $reverse
-
-    entries.each_with_index { |(f, n, l, s), i|
-      if f == part
-        $active << i
-      end
-    }
-
-    maxwidth = (entries.map { |(f, n, l, s)| f.size }.max || 0) + 1
-
-    $columns << entries
-    $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
-                  j < parts.size-1 ? MAX_COL_WIDTH : MAX_LAST_COL_WIDTH].min +
-                  (j < parts.size-1 ? 0 : 5)
-    d = ""  if d == "/"
-    d << "/" << part
+  dir.squeeze('/').split('/').each { |part|
+    $columns << Directory.new(d)
+    $columns.last.select part
+    
+    d += '/' << part
   }
+  $columns << Directory.new(d)
 
-  if $columns.last.empty?
-    $columns.last << ['', nil]
+  $active = $columns.last
+#XXX  $columns << Sidebar.new  if $sidebar
+
+  if col = prev_columns.find { |c| c.dir == $active.dir }
+    $active.cur = col.cur
   end
 
-  $active << (prev_active[$columns.size - 1] || 0)
-
   $pwd = dir
+end
+
+class Sidebar
+  def width
+    SIDEBAR_MIN_WIDTH
+  end
 end
 
 def refresh
@@ -114,24 +265,24 @@ def draw
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
-  sel = $columns[$active.size-1][$active.last][1]
+  sel = $active.sel
   Curses.setpos(Curses.lines-2, 0)
   Curses.addstr "[" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
   Curses.addstr "colfm - #$sort " << `ls -ldhi #{sel}`
 
-  total = $sidebar ? SIDEBAR_MIN_WIDTH : 0
+  total = 0
   cols = 0
-  $colwidth.reverse_each { |w|
-    total += w+1
+  $columns.reverse_each { |c|
+    total += c.width+1
     break  if total > max_x
     cols += 1
   }
   skipcols = $columns.size - cols
 
-  skiplines = [0, $active.last - max_y + 1].max
+  skiplines = [0, $active.cur - max_y + 1].max
 
-  $active.each_with_index { |act, i|
+  $columns.each_with_index { |col, i|
     next  if i < skipcols
 
     $columns[i].each_with_index { |entry, j|
@@ -139,16 +290,14 @@ def draw
       break  if j-skiplines > max_y
 
       Curses.setpos(j+y-skiplines, x)
-      Curses.standout  if j == act
-      Curses.attron(Curses::A_BOLD)  if $marked.include? entry[1]
-      Curses.addstr fmt(entry, $colwidth[i], i == $active.size-1)
-      Curses.attroff(Curses::A_BOLD)  if $marked.include? entry[1]
-      Curses.standend  if j == act
+      Curses.standout  if j == col.cur
+      Curses.attron(Curses::A_BOLD)  if entry.marked?
+      Curses.addstr entry.format(col.width, col == $active)
+      Curses.attroff(Curses::A_BOLD)  if entry.marked?
+      Curses.standend  if j == col.cur
     }
-    x += $colwidth[i] + 1
+    x += col.width + 1
   }
-
-  draw_sidebar(x)  if $sidebar
 end
 
 def draw_sidebar(x)
@@ -174,48 +323,6 @@ def draw_sidebar(x)
   }
 end
 
-def human(size)
-  units = %w{B K M G T P E Z Y}
-  until size < 1024
-    units.shift
-    size /= 1024.0
-  end
-  "%d%s" % [size, units.first]
-end
-
-def fmt(entry, width, detail)
-  file, full, lstat, stat = entry
-  return "-- empty --".ljust(width)  if lstat.nil?
-
-  if lstat.symlink?
-    sigil = "@"
-  elsif stat.directory?
-    sigil = "/"
-  elsif stat.executable?
-    sigil = "*"
-  elsif stat.socket?
-    sigil = "="
-  elsif stat.pipe?
-    sigil = "|"
-  else
-    sigil = ""
-  end
-
-  if detail && !stat.directory?
-    trunc(file+sigil, width-5).ljust(width - 5) + "%5s" % human(stat.size)
-  else
-    trunc(file+sigil, width).ljust(width)
-  end
-end
-
-def trunc(str, width)
-  if str.size > width
-    str[0, 2*width/3] + "*" + str[-(width/3)..-1]
-  else
-    str
-  end
-end
-
 def rtrunc(str, width)
   if str.size > width
     "..." + str[-width..-1]
@@ -224,15 +331,10 @@ def rtrunc(str, width)
   end
 end
 
-def cursor(offset)
-  a = $active.last
-  $active[$active.size-1] = [[a + offset, 0].max, $columns[$active.size - 1].size - 1].min
-end
-
 def isearch
   str = ""
   c = nil
-  orig = $active[$active.size-1]
+  orig = $active.cur
   
   loop {
     draw
@@ -244,24 +346,24 @@ def isearch
     
     case c = Curses.getch
     when ?/
-      sel = $columns[$active.size-1][$active.last]
-      if sel[3] && sel[3].directory?
-        cd sel[1]
+      sel = $active.sel
+      if sel.directory?
+        cd sel.path
       end
       str = ""
       c = nil
-      orig = $active[$active.size-1]
+      orig = $active.cur
       
     when 040..0176
       str << c
     when 0177                   # delete
       if str.empty?
-        $active[$active.size-1] = orig
+        $active.cur = orig
         break
       end
       str = str[0...-1]
     when 033, Curses::KEY_CTRL_C, Curses::KEY_CTRL_G
-      $active[$active.size-1] = orig
+      $active.cur = orig
       break
     when Curses::KEY_CTRL_W
       str.gsub!(/\A(.*)\S*\z/, '\1')
@@ -275,15 +377,14 @@ def isearch
       cd($pwd.split("/")[0...-1].join("/"))
       str = ""
       c = nil
-      orig = $active[$active.size-1]
+      orig = $active.cur
     end
     
-    $active[$active.size-1] = cur = orig
+    $active.cur = cur = orig
     looped = false
     begin
-      until $columns[$active.size-1][$active.last][0] =~ Regexp.new(str) ||
-          ($active[$active.size-1] == cur && looped)
-        $active[$active.size-1] = ($active[$active.size-1] + 1) % ($columns[$active.size-1].size)
+      until $active.sel.name =~ Regexp.new(str) || ($active.cur == cur && looped)
+        $active.next
         looped = true
       end
     rescue RegexpError
@@ -319,17 +420,17 @@ begin
     when ?h, Curses::KEY_LEFT
       cd($pwd.split("/")[0...-1].join("/"))
     when ?j, Curses::KEY_DOWN
-      cursor 1
+      $active.cursor 1
     when ?k, Curses::KEY_UP
-      cursor -1
+      $active.cursor -1
     when ?J, Curses::KEY_NPAGE
-      cursor Curses.lines/2
+      $active.cursor Curses.lines/2
     when ?K, Curses::KEY_PPAGE
-      cursor -Curses.lines/2
+      $active.cursor -Curses.lines/2
     when ?g, Curses::KEY_HOME
-      $active[$active.size-1] = 0
+      $active.first
     when ?G, Curses::KEY_END
-      $active[$active.size-1] = $columns[$active.size-1].size-1
+      $active.last
     when ?v
       $sidebar = !$sidebar
       refresh
@@ -344,18 +445,11 @@ begin
       draw
       Curses.refresh
     when ?l, Curses::KEY_RIGHT, ?\r
-      sel = $columns[$active.size-1][$active.last]
-      if sel[3] && sel[3].directory?
-        cd sel[1]
-      else
-        Curses.close_screen
-        system "less", sel[1]
-        Curses.refresh
-      end
+      $active.sel.activate
     when ?C
       $marked.clear
     when ?m, ?\s
-      sel = $columns[$active.size-1][$active.last][1]
+      sel = $active.sel.path
       if $marked.include? sel
         $marked -= [sel]
       else
