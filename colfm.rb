@@ -39,7 +39,7 @@ def sortkey(f,n,l,s)
   when 2 # extension
     [s.directory? ? 0 : 1, f.split('.').last]
   when 3 # size
-    [s.size]
+    [s.directory? ? 0 : 1, s.size]
   when 4 # atime
     [s.atime]
   when 5 # ctime
@@ -80,7 +80,8 @@ def cd(dir)
 
     $columns << entries
     $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
-                  j < parts.size-1 ? MAX_COL_WIDTH : MAX_LAST_COL_WIDTH].min
+                  j < parts.size-1 ? MAX_COL_WIDTH : MAX_LAST_COL_WIDTH].min +
+                  (j < parts.size-1 ? 0 : 5)
     d = ""  if d == "/"
     d << "/" << part
   }
@@ -135,7 +136,7 @@ def draw
       Curses.setpos(j+y-skiplines, x)
       Curses.standout  if j == act
       Curses.attron(Curses::A_BOLD)  if $marked.include? entry[1]
-      Curses.addstr fmt(entry, $colwidth[i])
+      Curses.addstr fmt(entry, $colwidth[i], i == $active.size-1)
       Curses.attroff(Curses::A_BOLD)  if $marked.include? entry[1]
       Curses.standend  if j == act
     }
@@ -168,7 +169,16 @@ def draw_sidebar(x)
   }
 end
 
-def fmt(entry, width)
+def human(size)
+  units = %w{B K M G T P E Z Y}
+  until size < 1024
+    units.shift
+    size /= 1024.0
+  end
+  "%d%s" % [size, units.first]
+end
+
+def fmt(entry, width, detail)
   file, full, lstat, stat = entry
   return "-- empty --".ljust(width)  if lstat.nil?
 
@@ -185,7 +195,12 @@ def fmt(entry, width)
   else
     sigil = ""
   end
-  trunc(file+sigil, width).ljust(width)
+
+  if detail && !stat.directory?
+    trunc(file+sigil, width-5).ljust(width - 5) + "%5s" % human(stat.size)
+  else
+    trunc(file+sigil, width).ljust(width)
+  end
 end
 
 def trunc(str, width)
