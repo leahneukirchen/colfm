@@ -8,7 +8,6 @@ TODO:
 - isearching for paths
 - more status info (size, owner etc.)
 - sorting
-- hide backup~, show .dotfiles
 - select multiple files, and operate on them
 - compressed files?
 - a bar on the left that shows favorites and /
@@ -17,6 +16,9 @@ TODO:
 $columns = []
 $colwidth = []
 $active = []
+
+$dotfiles = false
+$backup = true
 
 $pwd = ""
 
@@ -35,7 +37,10 @@ def cd(dir)
 
   parts = (dir + "/*").split('/')[1..-1]
   parts.each_with_index { |part, j|
-    entries = Dir.entries(d).delete_if { |f| f =~ /^\./ }.map { |f|
+    entries = Dir.entries(d).
+    delete_if { |f| f =~ /^\./ && !$dotfiles }.
+    delete_if { |f| f =~ /~\z/ && !$backup }.
+    map { |f|
       [f, if File.directory?(d + "/" + f)
             "/"
           elsif File.executable?(d + "/" + f)
@@ -68,6 +73,10 @@ def cd(dir)
   $active << (prev_active[$columns.size - 1] || 0)
 
   $pwd = dir
+end
+
+def refresh
+  cd($pwd)
 end
 
 def update_status
@@ -156,6 +165,12 @@ begin
     case Curses.getch
     when ?q
       break
+    when ?.
+      $dotfiles = !$dotfiles
+      refresh
+    when ?~
+      $backup = !$backup
+      refresh
     when ?h, Curses::KEY_LEFT
       cd($pwd.split("/")[0...-1].join("/"))
     when ?j, Curses::KEY_DOWN
