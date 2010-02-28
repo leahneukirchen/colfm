@@ -5,7 +5,6 @@ require 'pp'
 =begin
 TODO:
 - isearching for paths
-- sorting
 - select multiple files, and operate on them
 - compressed files?
 - a bar on the left that shows favorites and /
@@ -24,6 +23,27 @@ MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
 MAX_LAST_COL_WIDTH = 35
 
+$sort = 1
+$reverse = false
+def sortkey(f,l,s)
+  return []  unless l
+
+  case $sort
+  when 1 # name
+    [s.directory? ? 0 : 1, f]
+  when 2 # extension
+    [s.directory? ? 0 : 1, f.split('.').last]
+  when 3 # size
+    [s.size]
+  when 4 # atime
+    [s.atime]
+  when 5 # ctime
+    [s.ctime]
+  when 6 # mtime
+    [s.mtime]
+  end
+end
+
 def cd(dir)
   d = "/"
 
@@ -41,8 +61,9 @@ def cd(dir)
     map { |f|
       [f, File.lstat(d + "/" + f), File.stat(d + "/" + f)]
     }.sort_by { |f, l, s|
-      [s.directory?  ? 0 : 1, f]
+      sortkey(f, l, s)
     }
+    entries = entries.reverse  if $reverse
 
     entries.each_with_index { |(f, l, s), i|
       if f == part
@@ -88,7 +109,7 @@ def draw
   update_sel
 
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - " << `ls -ldhi #$sel`
+  Curses.addstr "colfm - #$sort " << `ls -ldhi #$sel`
 
   total = 0
   cols = 0
@@ -195,6 +216,12 @@ begin
       $active[$active.size-1] = 0
     when ?G, Curses::KEY_END
       $active[$active.size-1] = $columns[$active.size-1].size-1
+    when ?S
+      $reverse = !$reverse
+      refresh
+    when ?s
+      $sort = $sort%6 + 1
+      refresh
     when ?l, Curses::KEY_RIGHT     
       sel = $columns[$active.size-1][$active.last]
       if sel[2] && sel[2].directory?
