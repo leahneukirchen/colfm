@@ -6,7 +6,6 @@ require 'pp'
 TODO:
 - parse ARGV
 - isearching for paths
-- more status info (size, owner etc.)
 - sorting
 - select multiple files, and operate on them
 - compressed files?
@@ -41,24 +40,18 @@ def cd(dir)
     delete_if { |f| f =~ /^\./ && !$dotfiles }.
     delete_if { |f| f =~ /~\z/ && !$backup }.
     map { |f|
-      [f, if File.directory?(d + "/" + f)
-            "/"
-          elsif File.executable?(d + "/" + f)
-            "*"
-          else
-            ""
-          end]
-    }.sort_by { |f, t|
-      [t == "/" ? 0 : 1, f]
+      [f, File.lstat(d + "/" + f), File.stat(d + "/" + f)]
+    }.sort_by { |f, l, s|
+      [s.directory?  ? 0 : 1, f]
     }
 
-    entries.each_with_index { |(f, t), i|
+    entries.each_with_index { |(f, l, s), i|
       if f == part
         $active << i
       end
     }
 
-    maxwidth = entries.map { |(f, t)| f.size }.max + 1
+    maxwidth = (entries.map { |(f, l, s)| f.size }.max || 0) + 1
 
     $columns << entries
     $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
@@ -67,7 +60,7 @@ def cd(dir)
   }
 
   if $columns.last.empty?
-    $columns.last << ['', '<empty>']
+    $columns.last << ['', nil]
   end
 
   $active << (prev_active[$columns.size - 1] || 0)
@@ -79,7 +72,7 @@ def refresh
   cd($pwd)
 end
 
-def update_status
+def update_sel
   $sel = $pwd + "/" + $columns[$active.size-1][$active.last][0]
 end
 
@@ -93,10 +86,10 @@ def draw
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
-  update_status
+  update_sel
 
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - " << rtrunc($sel, 50)
+  Curses.addstr "colfm - " << `ls -ldhi #$sel`
 
   total = 0
   cols = 0
@@ -126,7 +119,21 @@ def draw
 end
 
 def fmt(entry, width)
-  trunc(entry[0] + entry[1], width).ljust(width)
+  file, lstat, stat = entry
+  return "-- empty --".ljust(width)  if lstat.nil?
+
+  if lstat.symlink?
+    sigil = "@"
+  elsif stat.directory?
+    sigil = "/"
+  elsif stat.socket?
+    sigil = "="
+  elsif stat.pipe?
+    sigil = "|"
+  else
+    sigil = ""
+  end
+  trunc(file+sigil, width).ljust(width)
 end
 
 def trunc(str, width)
@@ -187,10 +194,12 @@ begin
       $active[$active.size-1] = $columns[$active.size-1].size-1
     when ?l, Curses::KEY_RIGHT     
       sel = $columns[$active.size-1][$active.last]
-      if sel[1] == "/"
+      if sel[2] && sel[2].directory?
         cd $sel
       else
+        Curses.close_screen
         system "less", $sel
+        Curses.refresh
       end
     end
   }
