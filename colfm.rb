@@ -4,7 +4,6 @@ require 'pp'
 =begin
 TODO:
 - parse ARGV
-- special wide last column
 - pgup/pgdown
 - isearching for paths
 - shor...ten paths
@@ -23,6 +22,7 @@ $pwd = ""
 
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
+MAX_LAST_COL_WIDTH = 35
 
 def cd(dir)
   d = "/"
@@ -33,7 +33,8 @@ def cd(dir)
   $colwidth = []
   $active = []
 
-  (dir + "/*").split('/')[1..-1].each { |part|
+  parts = (dir + "/*").split('/')[1..-1]
+  parts.each_with_index { |part, j|
     entries = Dir.entries(d).delete_if { |f| f =~ /^\./ }.map { |f|
       [f, if File.directory?(d + "/" + f)
             "/"
@@ -55,7 +56,8 @@ def cd(dir)
     maxwidth = entries.map { |(f, t)| f.size }.max
 
     $columns << entries
-    $colwidth << [[MIN_COL_WIDTH, maxwidth].max, MAX_COL_WIDTH].min
+    $colwidth << [[MIN_COL_WIDTH, maxwidth].max,
+                  j < parts.size-1 ? MAX_COL_WIDTH : MAX_LAST_COL_WIDTH].min
     d << "/" << part
   }
 
