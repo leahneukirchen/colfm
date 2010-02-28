@@ -146,6 +146,8 @@ def fmt(entry, width)
     sigil = "@"
   elsif stat.directory?
     sigil = "/"
+  elsif stat.executable?
+    sigil = "*"
   elsif stat.socket?
     sigil = "="
   elsif stat.pipe?
