@@ -685,17 +685,23 @@ begin
   loop {
     draw
     
-    case Curses.getch
+    case c = Curses.getch
     when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
       refresh
     when ?q, Curses::KEY_F10
       break
-    when ?.
-      $dotfiles = !$dotfiles
+    when ?., ?~
+      $dotfiles = !$dotfiles  if c == ?.
+      $backup = !$backup      if c == ?~
+      names = $columns.map { |col| col.sel.name }
       refresh
-    when ?~
-      $backup = !$backup
-      refresh
+      $columns.each_with_index { |col, i|
+        col.first
+        col.next
+        while col.sel.name != names[i] && col.cur != 0
+          col.next
+        end
+      }
     when ?h, Curses::KEY_LEFT
       $active.leave
     when ?j, Curses::KEY_DOWN
