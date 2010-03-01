@@ -6,7 +6,6 @@ require 'pp'
 =begin
 TODO:
 - select multiple files, and operate on them
-- select files by regexp (%)
 - find favorites from mounts etc.
 - compressed files?
 - bring selected directory/files back to shell
@@ -172,6 +171,9 @@ class EmptyItem
   def activate
   end
 
+  def mark
+  end
+
   def marked?
     false
   end
@@ -207,6 +209,14 @@ class FileItem
     @lstat = File.lstat @path  rescue nil
     @stat = File.stat @path   rescue nil
     @stat ||= @lstat
+  end
+
+  def mark
+    if $marked.include? path
+      $marked -= [path]
+    else
+      $marked << path  
+    end
   end
 
   def marked?
@@ -386,6 +396,7 @@ def switch(columns, active=columns.last)
   $prev_active,  $active  = $active,  active
   $prev_columns, $columns = $columns, columns
   $prev_sidebar, $sidebar = $sidebar, false
+  $active.parent ||= $active
 end
 
 def switch_back
@@ -453,7 +464,7 @@ def draw
   Curses.setpos(Curses.lines-2, 0)
   Curses.addstr "[" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - #$sort - #{sel.ls_l}"
+  Curses.addstr "colfm - #$sort - #{sel ? sel.ls_l : ""}"
 
   if $sidebar
     sidebar = Sidebar.new
@@ -503,6 +514,10 @@ def readline(prompt)
     when 040..0176
       str << c
     when 0177                   # delete
+      if str.empty?
+        yield :cancel, str
+        break
+      end
       str = str[0...-1]
     when 033, Curses::KEY_CTRL_C, Curses::KEY_CTRL_G
       c = :cancel
@@ -510,6 +525,8 @@ def readline(prompt)
       str.gsub!(/\A(.*)\S*\z/, '\1')
     when Curses::KEY_CTRL_U
       str = ""
+    when ?\r
+      yield :accept, str
     end
 
     yield c, str
@@ -542,11 +559,6 @@ def isearch
 
     end
     
-    if str.empty? && c == 0177  # delete
-      $active.cur = orig
-      break
-    end
-
     if str == ".."
       $active.leave
       str.replace ""
@@ -563,6 +575,34 @@ def isearch
     rescue RegexpError
     end
   }        
+end
+
+def iselect
+  prev_marked = $marked.dup
+
+  readline("I-select: ") { |c, str|
+    case c
+    when :cancel
+      $marked = prev_marked
+      break
+    when :accept
+      break
+    end
+
+    next  if str.empty?
+
+    orig = $active.cur
+    $active.next
+
+    begin
+      $marked.clear
+      until $active.cur == orig
+        $active.sel.mark  if $active.sel.name =~ Regexp.new(str)
+        $active.next
+      end
+    rescue RegexpError
+    end
+  }
 end
 
 begin
@@ -582,6 +622,8 @@ begin
     draw
     
     case Curses.getch
+    when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
+      refresh
     when ?q
       break
     when ?.
@@ -624,18 +666,16 @@ begin
       isearch
       draw
       Curses.refresh
+    when ?%
+      iselect
+      draw
+      Curses.refresh
     when ?l, Curses::KEY_RIGHT, ?\r
       $active.sel.activate
     when ?C
       $marked.clear
     when ?m, ?\s
-      next  unless FileItem === $active.sel
-      sel = $active.sel.path
-      if $marked.include? sel
-        $marked -= [sel]
-      else
-        $marked << sel  
-      end
+      $active.sel.mark
     end
   }
 
