@@ -406,7 +406,7 @@ class FileItem
     if directory?
       "Directory #@name\n\n#{Dir.entries(@path).size} files"
     elsif file?
-      header = File.open(@path) { |f| f.read(1024) }
+      header = File.open(@path) { |f| f.read(1024) || "" }
       header.tr!("^\n \041-\176", '.')
       header
     else
