@@ -76,6 +76,8 @@ FAVORITES = [["/", "/"],
              ["~", "~"],
              ["~/Desktop", "Desktop"]]
 
+VIEWER = "less"
+
 RCFILE = File.expand_path("~/.colfmrc")
 
 $sort = 1
@@ -407,7 +409,7 @@ class FileItem
       $active.parent = prev_active
     else
       Curses.endwin
-      system "less", path
+      system VIEWER, path
       Curses.refresh
     end
   end
