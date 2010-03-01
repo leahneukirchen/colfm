@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 require 'curses'
+require 'etc'
 require 'pp'
 
 =begin
@@ -217,6 +218,62 @@ class FileItem
     "%d%s" % [size, units.first]
   end
 
+  def ls_l
+    "%s %d %s %s %s %s %s%s" %
+      [modestring, @lstat.nlink, user, group, sizenode, mtime, @name, linkinfo]
+  end
+
+  # Inspired by busybox.
+  def modestring
+    mode = @lstat.mode
+
+    buf = "0pcCd?bB-?l?s???"[(mode >> 12) & 0x0f, 1]
+    buf << (mode & 00400 == 0 ? "-" : "r")
+    buf << (mode & 00200 == 0 ? "-" : "w")
+    buf << (mode & 04000 == 0 ? (mode & 00100 == 0 ? "-" : "x") :
+                                (mode & 00100 == 0 ? "S" : "s"))
+    buf << (mode & 00040 == 0 ? "-" : "r")
+    buf << (mode & 00020 == 0 ? "-" : "w")
+    buf << (mode & 02000 == 0 ? (mode & 00010 == 0 ? "-" : "x") :
+                                (mode & 00010 == 0 ? "S" : "s"))
+    buf << (mode & 00004 == 0 ? "-" : "r")
+    buf << (mode & 00002 == 0 ? "-" : "w")
+    buf << (mode & 01000 == 0 ? (mode & 00001 == 0 ? "-" : "x") :
+                                (mode & 00001 == 0 ? "T" : "t"))
+  end
+
+  def user
+    Etc.getpwuid(@lstat.uid).name
+  end
+
+  def group
+    Etc.getgrgid(@lstat.gid).name
+  end
+
+  # Inspired by busybox.
+  def mtime
+    age = Time.now - @stat.mtime
+    @lstat.mtime.strftime("%b %d " +
+      (age > 60*60*24*365/2 || age < -15*60 ? " %Y" : "%H:%M"))
+  end
+
+  def sizenode
+    if @lstat.blockdev? || @lstat.chardev?
+      "%3d, %3d" % [@lstat.rdev>>8 & 0xff,
+                  @lstat.rdev    & 0xff]
+    else
+      human(@lstat.size)
+    end
+  end
+
+  def linkinfo
+    if symlink?
+      " -> #{File.readlink @path}"
+    else
+      ""
+    end
+  end
+
   def directory?
     @stat.directory?
   end
@@ -337,7 +394,7 @@ def draw
   Curses.setpos(Curses.lines-2, 0)
   Curses.addstr "[" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - #$sort " << `ls -ldhi #{sel}`
+  Curses.addstr "colfm - #$sort - #{sel.ls_l}"
 
   if $sidebar
     sidebar = Sidebar.new
