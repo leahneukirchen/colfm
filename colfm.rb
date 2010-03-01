@@ -21,8 +21,6 @@ $columns = []
 
 $marked = []
 
-$pwd = ""
-
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
 MAX_ACTIVE_COL_WIDTH = 35
@@ -386,8 +384,6 @@ def cd(dir)
   if col = prev_columns.find { |c| Directory === c && c.dir == $active.dir }
     $active.cur = col.cur
   end
-
-  $pwd = dir
 end
 
 class Sidebar
@@ -421,7 +417,7 @@ def draw
   }
 
   Curses.setpos(0, 0)
-  Curses.addstr $pwd
+  Curses.addstr $active.dir
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
