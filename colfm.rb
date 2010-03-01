@@ -8,7 +8,6 @@ TODO:
 - select multiple files, and operate on them
 - select files by regexp (%)
 - find favorites from mounts etc.
-- add a config file
 - compressed files?
 - last column more detailed?
 - bring selected directory/files back to shell
@@ -33,8 +32,15 @@ FAVORITES = [["/", "/"],
              ["~", "~"],
              ["~/Desktop", "Desktop"]]
 
+RCFILE = File.expand_path("~/.colfmrc")
+
 $sort = 1
 $reverse = false
+
+begin
+  load RCFILE
+rescue LoadError
+end
 
 class Directory
   attr_reader :dir
