@@ -433,11 +433,13 @@ class Sidebar
   def draw(x)
     # The sidebar may use the full width left over.
     width = Curses.cols - x - 1
+    max_y = Curses.lines - 3
     
     header = $active.sel.preview.to_s
     
     y = 2
     header.each_line { |l|
+      break  if y > max_y
       Curses.setpos(y, x)
       Curses.addstr l[0..width]
       y += 1
