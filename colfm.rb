@@ -1,7 +1,43 @@
 # -*- coding: utf-8 -*-
-require 'curses'
 require 'etc'
 require 'pp'
+
+require 'ffi'
+module Setlocale
+  extend FFI::Library
+  LIB_HANDLE = ffi_lib('c').first
+  LC_ALL = 6
+  attach_function :setlocale, [:int, :string], :uint
+end
+Setlocale.setlocale(Setlocale::LC_ALL, "")
+
+ENV["RUBY_FFI_NCURSES_LIB"] = "ncursesw"
+require 'ffi-ncurses'
+require 'ffi-ncurses/keydefs'
+('A'..'Z').each { |c| NCurses.const_set "KEY_CTRL_#{c}", c[0]-?A+1 }
+
+Curses = NCurses
+Curses.extend FFI::NCurses
+
+module Curses
+  A_BOLD = FFI::NCurses::A_BOLD
+
+  def self.cols
+    getmaxx($stdscr)
+  end
+
+  def self.lines
+    getmaxy($stdscr)
+  end
+
+  def self.setpos(y, x)
+    move(y, x)
+  end
+
+  def addstr(s)
+    waddnstr($stdscr, s, s.size)
+  end
+end
 
 =begin
 TODO:
@@ -247,7 +283,7 @@ class FileItem
   
   def trunc(str, width)
     if str.size > width
-      str[0, 2*width/3] + "*" + str[-(width/3)..-1]
+      str[0, 2*width/3] + "…" + str[-(width/3)..-1]
     else
       str
     end
@@ -360,7 +396,7 @@ class FileItem
       $columns.push($active = Directory.new(path))
       $active.parent = prev_active
     else
-      Curses.close_screen
+      Curses.endwin
       system "less", path
       Curses.refresh
     end
@@ -452,10 +488,7 @@ def refresh
 end
 
 def draw
-  0.upto(Curses.cols) { |i|
-    Curses.setpos(i,0)
-    Curses.clrtoeol
-  }
+  Curses.erase
 
   Curses.setpos(0, 0)
   Curses.addstr $active.dir
@@ -614,11 +647,12 @@ begin
     cd Dir.pwd
   end
 
-  Curses.init_screen
+  $stdscr = Curses.initscr
   Curses.nonl
   Curses.cbreak
   Curses.noecho
-  Curses.stdscr.keypad true
+  Curses.keypad($stdscr, 1)
+  Curses.meta($stdscr, 1)
 
   loop {
     draw
@@ -640,6 +674,8 @@ begin
       $active.cursor 1
     when ?k, Curses::KEY_UP
       $active.cursor -1
+    when ?l, Curses::KEY_RIGHT, ?\r
+      $active.sel.activate
     when ?J, Curses::KEY_NPAGE
       $active.cursor Curses.lines/2
     when ?K, Curses::KEY_PPAGE
@@ -672,15 +708,44 @@ begin
       iselect
       draw
       Curses.refresh
-    when ?l, Curses::KEY_RIGHT, ?\r
-      $active.sel.activate
     when ?C
       $marked.clear
     when ?m, ?\s
       $active.sel.mark
+    when ?!
+      readline("Shell command: ") { |c, str|
+        case c
+        when ?\t
+          str << $active.sel.name << " "
+        when Curses::KEY_BTAB
+          str << $marked.join(" ")
+        when Curses::KEY_LEFT
+          $active.leave
+        when Curses::KEY_DOWN
+          $active.cursor 1
+        when Curses::KEY_UP
+          $active.cursor -1
+        when Curses::KEY_RIGHT
+          $active.sel.activate
+        when :accept
+          Curses.endwin
+          if $active.kind_of? Directory
+            Dir.chdir $active.dir
+          end
+          system str
+          print "\n-- Shell command finished with #$? --"
+          STDOUT.flush
+          gets
+          Curses.refresh
+          break
+        when :cancel
+          break
+        end
+      }
+
     end
   }
 
 ensure
-  Curses.close_screen
+  Curses.endwin
 end
