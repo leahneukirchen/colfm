@@ -11,11 +11,13 @@ TODO:
 - compressed files?
 - last column more detailed?
 - bring selected directory/files back to shell
+- tabbed interface
 =end
 
 $dotfiles = false
 $backup = true
 $sidebar = false
+$selection = false
 
 $columns = []
 
@@ -137,6 +139,21 @@ class Favorites < Directory
     @entries = FAVORITES.map { |path, label|
       FavoriteItem.new(File.expand_path(path), label) 
     }
+  end
+end
+
+class Selection < Directory
+  def refresh
+    @entries = $marked.map { |path|
+      FavoriteItem.new(File.expand_path(path), File.expand_path(path)) 
+    }
+    if @entries.empty?
+      @entries = [EmptyItem.new("empty")]
+    end
+  end
+
+  def width
+    Curses.cols-1
   end
 end
 
@@ -366,11 +383,23 @@ class FavoriteItem < FileItem
   end
 end
 
+def switch(columns, active=columns.last)
+  $prev_active,  $active  = $active,  active
+  $prev_columns, $columns = $columns, columns
+  $prev_sidebar, $sidebar = $sidebar, false
+end
+
+def switch_back
+  $active = $prev_active
+  $columns = $prev_columns
+  $sidebar = $prev_sidebar
+end
+
 def cd(dir)
   d = "/"
   prev_columns = $columns
 
-  $columns = [$active = Favorites.new("")]
+  $columns = [$active = Favorites.new("Favorites")]
   $active.parent = $active
   $active.select "/"
   $active.sel.activate
@@ -561,6 +590,13 @@ begin
     when ?v
       $sidebar = !$sidebar
       refresh
+    when ?V
+      $selection = !$selection
+      if $selection
+        switch [Selection.new('Selection')]
+      else
+        switch_back
+      end
     when ?S
       $reverse = !$reverse
       refresh
@@ -576,11 +612,12 @@ begin
     when ?C
       $marked.clear
     when ?m, ?\s
+      next  unless FileItem === $active.sel
       sel = $active.sel.path
       if $marked.include? sel
         $marked -= [sel]
       else
-        $marked << sel
+        $marked << sel  
       end
     end
   }
