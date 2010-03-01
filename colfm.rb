@@ -13,7 +13,7 @@ TODO:
 require 'ffi'
 module Setlocale
   extend FFI::Library
-  LIB_HANDLE = ffi_lib('c').first
+  ffi_lib('c')
   LC_ALL = 6
   attach_function :setlocale, [:int, :string], :uint
 end
@@ -29,8 +29,16 @@ Curses.extend FFI::NCurses
 
 module Curses
   A_BOLD = FFI::NCurses::A_BOLD
+  KEY_F1 = NCurses::KEY_F0+1
+  KEY_F2 = NCurses::KEY_F0+2
+  KEY_F3 = NCurses::KEY_F0+3
+  KEY_F4 = NCurses::KEY_F0+4
+  KEY_F5 = NCurses::KEY_F0+5
   KEY_F6 = NCurses::KEY_F0+6
+  KEY_F7 = NCurses::KEY_F0+7
   KEY_F8 = NCurses::KEY_F0+8
+  KEY_F9 = NCurses::KEY_F0+9
+  KEY_F10 = NCurses::KEY_F0+10
 
   def self.cols
     getmaxx($stdscr)
@@ -591,7 +599,7 @@ def isearch
       $active.cur = orig
       break
 
-    when ?\r
+    when Curses::KEY_LEFT, Curses::KEY_DOWN, Curses::KEY_UP, :accept
       break
 
     end
@@ -642,6 +650,22 @@ def iselect
   }
 end
 
+def action(title, question, command, *args)
+  switch [Selection.new(title)]
+  refresh
+  draw
+  Curses.setpos(Curses.lines-1, 0)
+  Curses.clrtoeol
+  Curses.addstr "colfm - #$sort - #{question} (y/N) "
+  Curses.refresh
+  case Curses.getch
+  when ?y
+    system command, *args
+  end
+  switch_back
+  refresh
+end
+
 begin
   if ARGV.first && File.directory?(ARGV.first)
     cd ARGV.first
@@ -662,7 +686,7 @@ begin
     case Curses.getch
     when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
       refresh
-    when ?q
+    when ?q, Curses::KEY_F10
       break
     when ?.
       $dotfiles = !$dotfiles
@@ -676,7 +700,7 @@ begin
       $active.cursor 1
     when ?k, Curses::KEY_UP
       $active.cursor -1
-    when ?l, Curses::KEY_RIGHT, ?\r
+    when ?l, Curses::KEY_RIGHT, ?\r, Curses::KEY_F3
       $active.sel.activate
     when ?J, Curses::KEY_NPAGE
       $active.cursor Curses.lines/2
@@ -710,39 +734,36 @@ begin
       iselect
       draw
       Curses.refresh
-    when ?C
+    when ?c
       $marked.clear
     when ?m, ?\s
       $active.sel.mark
-    when Curses::KEY_F8, ?X
-      switch [Selection.new('Delete these files?')]
-      refresh
-      draw
-      Curses.setpos(Curses.lines-1, 0)
-      Curses.clrtoeol
-      Curses.addstr "colfm - #$sort - Delete these #{$marked.size} files recursively? (y/N) "
-      Curses.refresh
-      case Curses.getch
-      when ?y
-        system "rm", "-rf", *$marked
-      end
-      switch_back
-      refresh
+    when Curses::KEY_F5, ?C
+      target = $active.dir
+      action "Copy these files?",
+             "Copy these #{$marked.size} files to #{target}?",
+             "cp", "-a", *($marked + [target])
     when Curses::KEY_F6, ?M
       target = $active.dir
-      switch [Selection.new('Moves these files?')]
+      action "Move these files?",
+             "Move these #{$marked.size} files to #{target}?",
+             "mv", *($marked + [target])
+    when Curses::KEY_F7, ?+
+      readline("Create directory: ") { |c, str|
+        case c
+        when :accept
+          if $active.kind_of? Directory
+            Dir.chdir $active.dir
+          end
+          system "mkdir", "-p", str
+          break
+        end
+      }
       refresh
-      draw
-      Curses.setpos(Curses.lines-1, 0)
-      Curses.clrtoeol
-      Curses.addstr "colfm - #$sort - Move these #{$marked.size} files to #{target}? (y/N) "
-      Curses.refresh
-      case Curses.getch
-      when ?y
-        system "mv", *($marked + [target])
-      end
-      switch_back
-      refresh
+    when Curses::KEY_F8, ?X
+      action "Delete these files?",
+             "Delete these #{$marked.size} files recursively?",
+             "rm", "-rf", *$marked
     when ?!
       readline("Shell command: ") { |c, str|
         case c
