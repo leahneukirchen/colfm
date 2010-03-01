@@ -2,6 +2,14 @@
 require 'etc'
 require 'pp'
 
+=begin
+TODO:
+- find favorites from mounts etc.
+- compressed files?
+- tabbed interface
+=end
+
+
 require 'ffi'
 module Setlocale
   extend FFI::Library
@@ -21,6 +29,8 @@ Curses.extend FFI::NCurses
 
 module Curses
   A_BOLD = FFI::NCurses::A_BOLD
+  KEY_F6 = NCurses::KEY_F0+6
+  KEY_F8 = NCurses::KEY_F0+8
 
   def self.cols
     getmaxx($stdscr)
@@ -39,14 +49,6 @@ module Curses
   end
 end
 
-=begin
-TODO:
-- select multiple files, and operate on them
-- find favorites from mounts etc.
-- compressed files?
-- bring selected directory/files back to shell
-- tabbed interface
-=end
 
 $dotfiles = false
 $backup = true
@@ -712,6 +714,35 @@ begin
       $marked.clear
     when ?m, ?\s
       $active.sel.mark
+    when Curses::KEY_F8, ?X
+      switch [Selection.new('Delete these files?')]
+      refresh
+      draw
+      Curses.setpos(Curses.lines-1, 0)
+      Curses.clrtoeol
+      Curses.addstr "colfm - #$sort - Delete these #{$marked.size} files recursively? (y/N) "
+      Curses.refresh
+      case Curses.getch
+      when ?y
+        system "rm", "-rf", *$marked
+      end
+      switch_back
+      refresh
+    when Curses::KEY_F6, ?M
+      target = $active.dir
+      switch [Selection.new('Moves these files?')]
+      refresh
+      draw
+      Curses.setpos(Curses.lines-1, 0)
+      Curses.clrtoeol
+      Curses.addstr "colfm - #$sort - Move these #{$marked.size} files to #{target}? (y/N) "
+      Curses.refresh
+      case Curses.getch
+      when ?y
+        system "mv", *($marked + [target])
+      end
+      switch_back
+      refresh
     when ?!
       readline("Shell command: ") { |c, str|
         case c
