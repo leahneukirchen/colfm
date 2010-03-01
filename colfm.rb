@@ -9,7 +9,6 @@ TODO:
 - select files by regexp (%)
 - find favorites from mounts etc.
 - compressed files?
-- last column more detailed?
 - bring selected directory/files back to shell
 - tabbed interface
 =end
@@ -488,51 +487,69 @@ def rtrunc(str, width)
   end
 end
 
-def isearch
+def readline(prompt)
   str = ""
   c = nil
-  orig = $active.cur
-  
+
   loop {
     draw
-    
+
     Curses.setpos(Curses.lines-1, 0)
-    Curses.addstr "colfm - #$sort - #{c} I-Search: " << str
+    Curses.addstr "colfm - #$sort - #{prompt}" << str
     Curses.clrtoeol
     Curses.refresh
-    
-    case c = Curses.getch
-    when ?/
-      if $active.sel.directory?
-        $active.sel.activate  
-        str = ""
-        c = nil
-        orig = $active.cur
-      end
-      
+
+    case c = Curses.getch      
     when 040..0176
       str << c
     when 0177                   # delete
-      if str.empty?
-        $active.cur = orig
-        break
-      end
       str = str[0...-1]
     when 033, Curses::KEY_CTRL_C, Curses::KEY_CTRL_G
-      $active.cur = orig
-      break
+      c = :cancel
     when Curses::KEY_CTRL_W
       str.gsub!(/\A(.*)\S*\z/, '\1')
     when Curses::KEY_CTRL_U
       str = ""
-    else
+    end
+
+    yield c, str
+  }
+
+  str
+end
+
+def isearch
+  orig = $active.cur
+
+  readline("I-search: ") { |c, str|
+    case c
+    when Curses::KEY_LEFT
+      $active.leave
+
+    when ?/, Curses::KEY_RIGHT
+      if $active.sel.directory?
+        $active.sel.activate  
+        str.replace ""
+        orig = $active.cur
+      end
+
+    when :cancel
+      $active.cur = orig
       break
+
+    when ?\r
+      break
+
     end
     
+    if str.empty? && c == 0177  # delete
+      $active.cur = orig
+      break
+    end
+
     if str == ".."
       $active.leave
-      str = ""
-      c = nil
+      str.replace ""
       orig = $active.cur
     end
     
