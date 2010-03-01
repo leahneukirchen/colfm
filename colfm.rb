@@ -58,8 +58,10 @@ class Directory
     @entries.reverse!  if $reverse
 
     if @entries.empty?
-      @entries = [EmptyItem.new]
+      @entries = [EmptyItem.new("empty")]
     end
+  rescue Errno::EACCES
+    @entries = [EmptyItem.new("permission denied")]
   end
 
   def width
@@ -112,15 +114,25 @@ class Directory
       Curses.standend  if j == @cur
     }
   end
+
+  def leave
+    prev_active = $active
+    $active = $active.parent
+    $columns.delete prev_active  unless prev_active == $active
+  end
 end
 
 class EmptyItem
+  def initialize(msg)
+    @msg = msg
+  end
+
   def width
     0
   end
 
   def format(width, detail)
-    "-- empty --".ljust(width)
+    ls_l.ljust(width)
   end
 
   def activate
@@ -132,6 +144,18 @@ class EmptyItem
 
   def preview
     ""
+  end
+
+  def name
+    ""
+  end
+
+  def directory?
+    false
+  end
+
+  def ls_l
+    "-- #@msg --"
   end
 end
 
@@ -295,7 +319,7 @@ class Sidebar
 end
 
 def refresh
-  cd($pwd)
+  $columns.each { |col| col.refresh }
 end
 
 def draw
@@ -362,13 +386,12 @@ def isearch
     
     case c = Curses.getch
     when ?/
-      sel = $active.sel
-      if sel.directory?
-        cd sel.path
+      if $active.sel.directory?
+        $active.sel.activate  
+        str = ""
+        c = nil
+        orig = $active.cur
       end
-      str = ""
-      c = nil
-      orig = $active.cur
       
     when 040..0176
       str << c
@@ -390,7 +413,7 @@ def isearch
     end
     
     if str == ".."
-      cd($pwd.split("/")[0...-1].join("/"))
+      $active.leave
       str = ""
       c = nil
       orig = $active.cur
@@ -434,9 +457,7 @@ begin
       $backup = !$backup
       refresh
     when ?h, Curses::KEY_LEFT
-      prev_active = $active
-      $active = $active.parent
-      $columns.delete prev_active  unless prev_active == $active
+      $active.leave
     when ?j, Curses::KEY_DOWN
       $active.cursor 1
     when ?k, Curses::KEY_UP
