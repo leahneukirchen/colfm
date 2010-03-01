@@ -7,8 +7,9 @@ require 'pp'
 TODO:
 - select multiple files, and operate on them
 - select files by regexp (%)
+- find favorites from mounts etc.
+- add a config file
 - compressed files?
-- a bar on the left that shows favorites and /
 - last column more detailed?
 - bring selected directory/files back to shell
 =end
@@ -27,6 +28,10 @@ MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
 MAX_ACTIVE_COL_WIDTH = 35
 SIDEBAR_MIN_WIDTH = 20
+
+FAVORITES = [["/", "/"],
+             ["~", "~"],
+             ["~/Desktop", "Desktop"]]
 
 $sort = 1
 $reverse = false
@@ -123,6 +128,14 @@ class Directory
   end
 end
 
+class Favorites < Directory
+  def refresh
+    @entries = FAVORITES.map { |path, label|
+      FavoriteItem.new(File.expand_path(path), label) 
+    }
+  end
+end
+
 class EmptyItem
   def initialize(msg)
     @msg = msg
@@ -171,8 +184,9 @@ class FileItem
 
   def refresh
     @name = File.basename @path
-    @lstat = File.lstat @path
-    @stat = File.stat @path
+    @lstat = File.lstat @path  rescue nil
+    @stat = File.stat @path   rescue nil
+    @stat ||= @lstat
   end
 
   def marked?
@@ -219,6 +233,7 @@ class FileItem
   end
 
   def ls_l
+    return "-- not found --"  unless @lstat
     "%s %d %s %s %s %s %s%s" %
       [modestring, @lstat.nlink, user, group, sizenode, mtime, @name, linkinfo]
   end
@@ -275,15 +290,15 @@ class FileItem
   end
 
   def directory?
-    @stat.directory?
+    @stat && @stat.directory?
   end
 
   def file?
-    @stat.file?
+    @stat && @stat.file?
   end
 
   def symlink?
-    @lstat.symlink?
+    @lstat && @lstat.symlink?
   end
 
   def sortkey
@@ -336,12 +351,26 @@ class FileItem
   end
 end
 
+class FavoriteItem < FileItem
+  def initialize(path, label=nil)
+    super path
+    @label = label || @name
+  end
+
+  def format(width, detail)
+    trunc(@label, width).ljust(width)    
+  end
+end
+
 def cd(dir)
   d = "/"
   prev_columns = $columns
 
-  $columns = [$active = Directory.new("/")]
+  $columns = [$active = Favorites.new("")]
   $active.parent = $active
+  $active.select "/"
+  $active.sel.activate
+
   dir.split('/').each { |part|
     next  if part.empty?
     $active.select part
