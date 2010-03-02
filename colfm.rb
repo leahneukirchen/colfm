@@ -673,7 +673,7 @@ end
 
 begin
   if ARGV.first && File.directory?(ARGV.first)
-    cd ARGV.first
+    cd File.expand_path(ARGV.first)
   elsif ARGV.first == "-" && (dir = File.read(SAVE_DIR)  rescue nil)
     cd dir
   else
