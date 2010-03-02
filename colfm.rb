@@ -687,6 +687,7 @@ begin
   $stdscr = Curses.initscr
   Curses.nonl
   Curses.cbreak
+  Curses.raw
   Curses.noecho
   Curses.keypad($stdscr, 1)
   Curses.meta($stdscr, 1)
@@ -697,6 +698,8 @@ begin
     case c = Curses.getch
     when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
       refresh
+      Curses.clear
+      draw
     when ?q, Curses::KEY_F10, Curses::KEY_CTRL_O, -1
       break
     when ?., ?~
@@ -743,7 +746,7 @@ begin
     when ?s
       $sort = $sort%6 + 1
       refresh
-    when ?/
+    when ?/, Curses::KEY_CTRL_S
       isearch
       draw
       Curses.refresh
