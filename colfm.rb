@@ -80,6 +80,8 @@ FAVORITES = [["/", "/"],
 VIEWER = "less"
 
 RCFILE = File.expand_path("~/.colfmrc")
+SAVE_MARKED = File.expand_path("~/.colfmsel")
+SAVE_DIR = File.expand_path("~/.colfmdir")
 
 $sort = 1
 $reverse = false
@@ -672,9 +674,13 @@ end
 begin
   if ARGV.first && File.directory?(ARGV.first)
     cd ARGV.first
+  elsif ARGV.first == "-" && (dir = File.read(SAVE_DIR)  rescue nil)
+    cd dir
   else
     cd Dir.pwd
   end
+
+  $marked = File.read(SAVE_MARKED).split("\0")  rescue nil  if SAVE_MARKED
 
   $stdscr = Curses.initscr
   Curses.nonl
@@ -806,6 +812,9 @@ begin
 
     end
   }
+
+  File.open(SAVE_MARKED, "w") { |out| out << $marked.join("\0") }  if SAVE_MARKED
+  File.open(SAVE_DIR, "w") { |out| out << $active.dir }  if SAVE_DIR
 
 ensure
   Curses.endwin
