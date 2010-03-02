@@ -108,6 +108,8 @@ class Directory
   end
 
   def refresh
+    Dir.chdir @dir
+
     @entries = Dir.entries(@dir).
     delete_if { |f| f =~ /^\./ && !$dotfiles }.
     delete_if { |f| f =~ /~\z/ && !$backup }.
@@ -767,9 +769,6 @@ begin
       readline("Create directory: ") { |c, str|
         case c
         when :accept
-          if $active.kind_of? Directory
-            Dir.chdir $active.dir
-          end
           system "mkdir", "-p", str
           break
         end
@@ -796,9 +795,6 @@ begin
           $active.sel.activate
         when :accept
           Curses.endwin
-          if $active.kind_of? Directory
-            Dir.chdir $active.dir
-          end
           system str
           print "\n-- Shell command finished with #$? --"
           STDOUT.flush
@@ -814,7 +810,7 @@ begin
   }
 
   File.open(SAVE_MARKED, "w") { |out| out << $marked.join("\0") }  if SAVE_MARKED
-  File.open(SAVE_DIR, "w") { |out| out << $active.dir }  if SAVE_DIR
+  File.open(SAVE_DIR, "w") { |out| out << Dir.pwd }  if SAVE_DIR
 
 ensure
   Curses.endwin
