@@ -1,0 +1,87 @@
+= colfm - a console, column-oriented file manager
+
+colfm is a new, lightweight file manager written in Ruby with
+FFI::Ncurses.  It is based on ideas of NeXTSTEP's File Viewer,
+the OS X Finder, Emacs dired, vifm, and Midnight Commander.
+
+== Installation
+
+    gem install ffi ffi-ncurses
+    cp colfm.rb ~/bin
+    cat colfm.zsh >>~/.zshrc        # or better source it
+
+== Usage
+
+colfm displays the path to the current directory in columns.  The
+right-most column is the currently active and is displayed in more
+detail (shows file sizes).
+
+== Command cheatsheet
+
+    j k  Up Down      move selection up/down
+    h    Left         go to parent column
+    l F3 Right Enter  enter directory/view file
+    J K  Next Prev    scroll up/down by half a screen
+    g    Home         move to first file
+    G    End          move to last file
+    /  C-s            enter I-search, find file by regular expression:
+        /   Right         enter selected directory
+        ..  Left          go to parent
+    
+    .  ~              toggle display of dotfiles, backup files
+    s                 toggle sorting (name, extension, size, atime, ctime, mtime)
+    S                 reverse sorting
+    v                 toggle sidebar preview
+    
+    m  SPC            mark/unmark selected file
+    %                 enter I-select, mark files by regular expression
+    c                 clear list of marked files
+    V                 list marked files
+    C  F5             copy marked files into current directory (cp -a)
+    M  F6             move marked files into current directory (mv)
+    +  F7             create new directory (mkdir -p)
+    X  F8             remove marked files recursively (rm -rf)
+    
+    !                 run shell command:
+        TAB               insert currently selected file
+        S-TAB             insert currently marked files
+    C-l  C-r          refresh display
+    q  F10  C-o       quit colfm
+    
+All prompts can be canceled with ESC or C-g and support primitive
+editing with C-w and C-u in classical Unix manner.
+
+== ZSH integration
+
+After loading colfm.zsh, you can:
+
+* quickly toggle between shell and colfm by pressing C-o
+* use "ccd" to change the directory with colfm
+* use "cargs" as a shortcut for xargs on the marked files
+* use "csel" to list the currently marked files, or pipe to csel to set them
+
+== Copyright
+
+Copyright (C) 2010 Christian Neukirchen <http://purl.org/net/chneukirchen>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+== Links
+
+Github page:: <http://github.com/chneukirchen/colfm>
+Christian Neukirchen:: <http://chneukirchen.org/>
