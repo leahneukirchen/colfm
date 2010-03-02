@@ -697,7 +697,7 @@ begin
     case c = Curses.getch
     when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
       refresh
-    when ?q, Curses::KEY_F10
+    when ?q, Curses::KEY_F10, Curses::KEY_CTRL_O, -1
       break
     when ?., ?~
       $dotfiles = !$dotfiles  if c == ?.
