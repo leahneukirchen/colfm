@@ -508,13 +508,15 @@ def draw
   Curses.erase
 
   Curses.setpos(0, 0)
+  Curses.attron(Curses::A_BOLD)
   Curses.addstr $active.dir
+  Curses.attroff(Curses::A_BOLD)
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
   sel = $active.sel
   Curses.setpos(Curses.lines-2, 0)
-  Curses.addstr "[" + $marked.join(" ") + "]"
+  Curses.addstr "#{$marked.size} [" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
   Curses.addstr "colfm - #$sort - #{sel ? sel.ls_l : ""}"
 
@@ -565,7 +567,7 @@ def readline(prompt)
     case c = Curses.getch      
     when 040..0176
       str << c
-    when 0177                   # delete
+    when 0177, Curses::KEY_BACKSPACE                   # delete
       if str.empty?
         yield :cancel, str
         break
@@ -673,6 +675,9 @@ def action(title, question, command, *args)
   refresh
 end
 
+
+abort "no tty"  unless STDIN.tty?
+
 begin
   if ARGV.first && File.directory?(ARGV.first)
     cd File.expand_path(ARGV.first)
@@ -694,13 +699,13 @@ begin
 
   loop {
     draw
-    
+
     case c = Curses.getch
     when Curses::KEY_CTRL_L, Curses::KEY_CTRL_R
       refresh
       Curses.clear
       draw
-    when ?q, Curses::KEY_F10, Curses::KEY_CTRL_O, -1
+    when ?q, Curses::KEY_F10, Curses::KEY_CTRL_O
       break
     when ?., ?~
       $dotfiles = !$dotfiles  if c == ?.
@@ -808,7 +813,6 @@ begin
           break
         end
       }
-
     end
   }
 
