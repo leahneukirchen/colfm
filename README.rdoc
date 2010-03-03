@@ -4,6 +4,10 @@ colfm is a new, lightweight file manager written in Ruby with
 FFI::Ncurses.  It is based on ideas of NeXTSTEP's File Viewer,
 the OS X Finder, Emacs dired, vifm, and Midnight Commander.
 
+== Screenshot
+
+http://imgur.com/WetkX.png
+
 == Installation
 
     gem install ffi ffi-ncurses
