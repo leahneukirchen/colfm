@@ -341,11 +341,11 @@ class FileItem
   end
 
   def user
-    Etc.getpwuid(@lstat.uid).name
+    Etc.getpwuid(@lstat.uid).name  rescue @lstat.uid.to_s
   end
 
   def group
-    Etc.getgrgid(@lstat.gid).name
+    Etc.getgrgid(@lstat.gid).name  rescue @lstat.gid.to_s
   end
 
   # Inspired by busybox.
