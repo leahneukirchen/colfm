@@ -65,12 +65,13 @@ $sidebar = false
 $selection = false
 
 $columns = []
+$tabs = []
 
 $marked = []
 
 MIN_COL_WIDTH = 8
 MAX_COL_WIDTH = 20
-MAX_ACTIVE_COL_WIDTH = 35
+MAX_ACTIVE_COL_WIDTH = 28
 SIDEBAR_MIN_WIDTH = 20
 
 FAVORITES = [["/", "/"],
@@ -420,11 +421,11 @@ class FileItem
   def activate
     if directory?
       prev_active = $active
-      $columns.push($active = Directory.new(path))
+      $columns += [$active = Directory.new(path)]
       $active.parent = prev_active
     elsif $avfs && File.directory?(File.join($avfs, path + "#"))
       prev_active = $active
-      $columns.push($active = Directory.new(File.join($avfs, path + "#")))
+      $columns += [$active = Directory.new(File.join($avfs, path + "#"))]
       $active.parent = prev_active
     else
       Curses.endwin
@@ -522,9 +523,18 @@ def draw
   Curses.erase
 
   Curses.setpos(0, 0)
-  Curses.attron(Curses::A_BOLD)
-  Curses.addstr rtrunc($active.dir, Curses.cols)
-  Curses.attroff(Curses::A_BOLD)
+
+  curwidth = [Curses.cols/2, $active.dir.size+1].min
+  tabwidth = [((Curses.cols-curwidth) / ($tabs.size-1)  rescue 0), 0].max
+  $tabs.each_with_index { |t, i|
+    if i == $tabcur
+      Curses.attron(Curses::A_BOLD)
+      Curses.addstr rtrunc($active.dir + " ", curwidth)
+      Curses.attroff(Curses::A_BOLD)
+    else
+      Curses.addstr rtrunc(t[1].dir + " ", tabwidth)
+    end
+  }
 
   max_x, max_y = Curses.cols, Curses.lines-5
 
@@ -560,6 +570,7 @@ end
 
 def rtrunc(str, width)
   if str.size > width
+    return "_"  if width < 4
     "..." + str[-width+3..-1]
   else
     str
@@ -693,21 +704,28 @@ end
 abort "no tty"  unless STDIN.tty?
 
 begin
-  dir = case ARGV.first
-        when "-"
-          File.read(SAVE_DIR)  rescue Dir.pwd
-        when nil
-          Dir.pwd
-        else
-          File.expand_path(ARGV.first)
-        end
+  $tabs = []
+  ARGV.replace ["."]  if ARGV.empty?
+  ARGV.each { |arg|
+    case arg
+    when "-"
+      cd File.read(SAVE_DIR)  rescue Dir.pwd
+    when nil
+      cd Dir.pwd
+    else
+      dir = File.expand_path(arg)
+      if File.directory?(dir) ||
+          $avfs && File.directory?(File.join($avfs, dir + "#"))
+        cd dir
+      else
+        cd Dir.pwd
+      end
+    end
+    $tabs << [$columns, $active]
+  }
 
-  if File.directory?(dir) ||
-      $avfs && File.directory?(File.join($avfs, dir + "#"))
-    cd dir
-  else
-    cd Dir.pwd
-  end
+  $tabcur = 0
+  $columns, $active = $tabs[$tabcur]
 
   $marked = File.read(SAVE_MARKED).split("\0")  rescue []  if SAVE_MARKED
 
@@ -757,6 +775,26 @@ begin
       $active.first
     when ?G, Curses::KEY_END
       $active.last
+    when ?n
+      if $active.sel.directory?
+        $tabs[$tabcur] = [$columns, $active]
+        $active.sel.activate
+        $tabs.insert $tabcur+1, [$columns, $active]
+        $columns, $active = $tabs[$tabcur]
+      end
+    when ?N
+      $tabs.delete_at($tabcur)  if $tabs.size > 1
+      $tabcur = $tabcur % $tabs.size
+      $columns, $active = $tabs[$tabcur]
+      refresh
+    when ?t
+      $tabs[$tabcur] = [$columns, $active]
+      $tabcur = ($tabcur+1) % $tabs.size
+      $columns, $active = $tabs[$tabcur]
+    when ?T
+      $tabs[$tabcur] = [$columns, $active]
+      $tabcur = ($tabcur-1) % $tabs.size
+      $columns, $active = $tabs[$tabcur]
     when ?v
       $sidebar = !$sidebar
       refresh
