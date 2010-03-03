@@ -86,10 +86,15 @@ SAVE_DIR = File.expand_path("~/.colfmdir")
 $sort = 1
 $reverse = false
 
+if File.directory?(File.expand_path("~/.avfs/#avfsstat"))
+  $avfs = File.expand_path("~/.avfs")
+end
+
 begin
   load RCFILE
 rescue LoadError
 end
+
 
 class Directory
   attr_reader :dir
@@ -411,6 +416,10 @@ class FileItem
     if directory?
       prev_active = $active
       $columns.push($active = Directory.new(path))
+      $active.parent = prev_active
+    elsif $avfs && File.directory?(File.join($avfs, path + "#"))
+      prev_active = $active
+      $columns.push($active = Directory.new(File.join($avfs, path + "#")))
       $active.parent = prev_active
     else
       Curses.endwin
