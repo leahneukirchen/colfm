@@ -518,7 +518,7 @@ def draw
 
   Curses.setpos(0, 0)
   Curses.attron(Curses::A_BOLD)
-  Curses.addstr $active.dir
+  Curses.addstr rtrunc($active.dir, Curses.cols)
   Curses.attroff(Curses::A_BOLD)
 
   max_x, max_y = Curses.cols, Curses.lines-5
@@ -555,7 +555,7 @@ end
 
 def rtrunc(str, width)
   if str.size > width
-    "..." + str[-width..-1]
+    "..." + str[-width+3..-1]
   else
     str
   end
