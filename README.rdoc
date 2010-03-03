@@ -10,6 +10,8 @@ http://imgur.com/WetkX.png
 
 == Installation
 
+Only Ruby 1.8 is supported so far.
+
     gem install ffi ffi-ncurses
     cp colfm.rb ~/bin
     cat colfm.zsh >>~/.zshrc        # or better source it
@@ -64,6 +66,15 @@ After loading colfm.zsh, you can:
 * use "cargs" as a shortcut for xargs on the marked files
 * use "csel" to list the currently marked files, or pipe to csel to set them
 
+== AVFS support
+
+If you want to browse various file archives or access remote file
+systems, colfm supports the AVFS fuse daemon:
+
+    avfsmount
+    colfm.rb ~/src/ruby-1.8.7-p249.tar.gz      # transparent
+    colfm.rb ~/.avfs/#ftp:ftp.ruby-lang.org/   # direct
+
 == Copyright
 
 Copyright (C) 2010 Christian Neukirchen <http://purl.org/net/chneukirchen>
@@ -88,4 +99,5 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 == Links
 
 Github page:: <http://github.com/chneukirchen/colfm>
+AVFS:: <http://sourceforge.net/projects/avf/>
 Christian Neukirchen:: <http://chneukirchen.org/>
