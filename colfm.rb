@@ -163,7 +163,12 @@ class Directory
       @cur = i
       return  if e.name == name
     }
-    @cur = 0
+    if File.directory?(d=File.join(dir, name))
+      @entries << FileItem.new(d)
+      self.last
+    else
+      @cur = 0
+    end
   end
 
   def draw(x)
@@ -688,15 +693,23 @@ end
 abort "no tty"  unless STDIN.tty?
 
 begin
-  if ARGV.first && File.directory?(ARGV.first)
-    cd File.expand_path(ARGV.first)
-  elsif ARGV.first == "-" && (dir = File.read(SAVE_DIR)  rescue nil)
+  dir = case ARGV.first
+        when "-"
+          File.read(SAVE_DIR)  rescue Dir.pwd
+        when nil
+          Dir.pwd
+        else
+          File.expand_path(ARGV.first)
+        end
+
+  if File.directory?(dir) ||
+      $avfs && File.directory?(File.join($avfs, dir + "#"))
     cd dir
   else
     cd Dir.pwd
   end
 
-  $marked = File.read(SAVE_MARKED).split("\0")  rescue nil  if SAVE_MARKED
+  $marked = File.read(SAVE_MARKED).split("\0")  rescue []  if SAVE_MARKED
 
   $stdscr = Curses.initscr
   Curses.nonl
