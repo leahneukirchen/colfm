@@ -39,6 +39,10 @@ detail (shows file sizes).
     S                 reverse sorting
     v                 toggle sidebar preview
     
+    n                 open directory in new tab
+    N                 close current tab
+    t  T              next/previous tab
+    
     m  SPC            mark/unmark selected file
     %                 enter I-select, mark files by regular expression
     c                 clear list of marked files
