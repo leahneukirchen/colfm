@@ -41,7 +41,7 @@ detail (shows file sizes).
     
     n                 open directory in new tab
     N                 close current tab
-    t  T              next/previous tab
+    t TAB  T S-TAB    next/previous tab
     
     m  SPC            mark/unmark selected file
     %                 enter I-select, mark files by regular expression

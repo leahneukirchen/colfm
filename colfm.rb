@@ -788,11 +788,11 @@ begin
       $tabcur = $tabcur % $tabs.size
       $columns, $active = $tabs[$tabcur]
       refresh
-    when ?t
+    when ?t, ?\t
       $tabs[$tabcur] = [$columns, $active]
       $tabcur = ($tabcur+1) % $tabs.size
       $columns, $active = $tabs[$tabcur]
-    when ?T
+    when ?T, Curses::KEY_BTAB
       $tabs[$tabcur] = [$columns, $active]
       $tabcur = ($tabcur-1) % $tabs.size
       $columns, $active = $tabs[$tabcur]
