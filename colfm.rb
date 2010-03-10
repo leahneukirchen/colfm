@@ -3,14 +3,6 @@
 require 'etc'
 require 'pp'
 
-=begin
-TODO:
-- find favorites from mounts etc.
-- compressed files?
-- tabbed interface
-=end
-
-
 require 'ffi'
 module Setlocale
   extend FFI::Library
