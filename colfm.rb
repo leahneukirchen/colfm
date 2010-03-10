@@ -705,6 +705,8 @@ end
 abort "no tty"  unless STDIN.tty?
 
 begin
+  base = Dir.pwd
+
   $tabs = []
   ARGV.replace ["."]  if ARGV.empty?
   ARGV.each { |arg|
@@ -714,7 +716,7 @@ begin
     when nil
       cd Dir.pwd
     else
-      dir = File.expand_path(arg)
+      dir = File.expand_path(arg, base)
       if File.directory?(dir) ||
           $avfs && File.directory?(File.join($avfs, dir + "#"))
         cd dir
