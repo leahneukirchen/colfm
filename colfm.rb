@@ -692,12 +692,13 @@ def action(title, question, command, *args)
   Curses.clrtoeol
   Curses.addstr "colfm - #$sort - #{question} (y/N) "
   Curses.refresh
-  case Curses.getch
+  case c = Curses.getch
   when ?y
     system command, *args
   end
   switch_back
   refresh
+  c == ?y
 end
 
 
@@ -832,7 +833,7 @@ begin
       target = $active.dir
       action "Move these files?",
              "Move these #{$marked.size} files to #{target}?",
-             "mv", *($marked + [target])
+             "mv", *($marked + [target])  and $marked.clear
     when Curses::KEY_F7, ?+
       readline("Create directory: ") { |c, str|
         case c
@@ -845,7 +846,7 @@ begin
     when Curses::KEY_F8, ?X
       action "Delete these files?",
              "Delete these #{$marked.size} files recursively?",
-             "rm", "-rf", *$marked
+             "rm", "-rf", *$marked  and $marked.clear
     when ?!
       readline("Shell command: ") { |c, str|
         case c
