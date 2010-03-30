@@ -515,6 +515,10 @@ class Sidebar
   end
 end
 
+def sort_string
+  ($reverse ? "↓" : "↑") + SORT_NAMES[$sort]
+end
+
 def refresh
   $columns.each { |col| col.refresh }
 end
@@ -542,9 +546,6 @@ def draw
   Curses.setpos(Curses.lines-2, 0)
   Curses.addstr "#{$marked.size} [" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
-  sort_string = ""
-  sort_string << ($reverse ? "↓" : "↑")
-  sort_string << SORT_NAMES[$sort]
   Curses.addstr "colfm - #{sort_string} - #{sel ? sel.ls_l : ""}"
 
   if $sidebar
@@ -588,7 +589,7 @@ def readline(prompt)
     draw
 
     Curses.setpos(Curses.lines-1, 0)
-    Curses.addstr "colfm - #$sort - #{prompt}" << str
+    Curses.addstr "colfm - #{sort_string} - #{prompt}" << str
     Curses.clrtoeol
     Curses.refresh
 
@@ -693,7 +694,7 @@ def action(title, question, command, *args)
   draw
   Curses.setpos(Curses.lines-1, 0)
   Curses.clrtoeol
-  Curses.addstr "colfm - #$sort - #{question} (y/N) "
+  Curses.addstr "colfm - #{sort_string} - #{question} (y/N) "
   Curses.refresh
   case c = Curses.getch
   when ?y
