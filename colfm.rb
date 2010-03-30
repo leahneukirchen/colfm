@@ -532,7 +532,34 @@ def draw
 
   sel = $active.sel
   Curses.setpos(Curses.lines-2, 0)
-  Curses.addstr "#{$marked.size} [" + $marked.join(" ") + "]"
+  if $marked.size > 0
+    s1 = $marked.size.to_s
+    s2 = ""
+
+    width = Curses.cols - s1.size - 3
+    oversized = false
+
+    $marked.each do |mark|
+      if (s2.size + mark.size) < width
+        s2 << mark << " "
+      else
+        oversized = true
+        cutoff_width = width-s2.size-3
+        if cutoff_width >= 0
+          s2 << mark[0..cutoff_width] + "…"
+        else
+          s2 << "…"
+        end
+        break
+      end
+    end
+    s2[-1..-1] = '' if s2[-1..-1] == " "
+
+    str = "#{s1} [#{s2}" + (oversized ? "]" : "")
+    Curses.addstr str
+  else
+    Curses.addstr "No marked files"
+  end
   Curses.setpos(Curses.lines-1, 0)
   Curses.addstr "colfm - #$sort - #{sel ? sel.ls_l : ""}"
 
