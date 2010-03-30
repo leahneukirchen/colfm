@@ -79,6 +79,14 @@ SAVE_DIR = File.expand_path("~/.colfmdir")
 $sort = 1
 $reverse = false
 
+SORT_NAMES = [nil,
+                  "name",
+                  "extension",
+                  "size",
+                  "atime",
+                  "ctime",
+                  "mtime"]
+
 if File.directory?(File.expand_path("~/.avfs/#avfsstat"))
   $avfs = File.expand_path("~/.avfs")
 end
@@ -534,7 +542,10 @@ def draw
   Curses.setpos(Curses.lines-2, 0)
   Curses.addstr "#{$marked.size} [" + $marked.join(" ") + "]"
   Curses.setpos(Curses.lines-1, 0)
-  Curses.addstr "colfm - #$sort - #{sel ? sel.ls_l : ""}"
+  sort_string = ""
+  sort_string << ($reverse ? "↓" : "↑")
+  sort_string << SORT_NAMES[$sort]
+  Curses.addstr "colfm - #{sort_string} - #{sel ? sel.ls_l : ""}"
 
   if $sidebar
     sidebar = Sidebar.new
