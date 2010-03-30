@@ -555,7 +555,7 @@ def draw
     end
     s2[-1..-1] = '' if s2[-1..-1] == " "
 
-    str = "#{s1} [#{s2}" + (oversized ? "]" : "")
+    str = "#{s1} [#{s2}" + (oversized ? "" : "]")
     Curses.addstr str
   else
     Curses.addstr "No marked files"
