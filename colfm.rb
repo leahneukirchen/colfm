@@ -174,7 +174,6 @@ class Directory
       break  if j-skiplines > max_y
       
       Curses.setpos(j+2-skiplines, x)
-      Curses.standout  if j == @cur
 
       if $LS_COLORS
         pair = nil
@@ -238,6 +237,7 @@ class Directory
           Curses.attron(pair)
         end
       end
+      Curses.standout  if j == @cur
       Curses.attron(Curses::A_BOLD)  if entry.marked?
 
       Curses.addstr entry.format(width, active?)
