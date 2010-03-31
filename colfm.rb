@@ -50,6 +50,7 @@ module Curses
   end
 end
 
+$LS_COLORS = nil
 
 $dotfiles = false
 $backup = true
@@ -174,8 +175,75 @@ class Directory
       
       Curses.setpos(j+2-skiplines, x)
       Curses.standout  if j == @cur
+
+      if $LS_COLORS
+        pair = nil
+        ls_mode = nil
+
+        if entry.directory? && !entry.symlink?
+          if entry.stat.mode & 00002 > 0
+            if entry.stat.mode & 01000 > 0
+              # sticky and other-writable
+              ls_mode = "tw"
+            else
+              # other-writable
+              ls_mode = "ow"
+            end
+          else
+            if entry.stat.mode & 01000 > 0
+              # sticky but not other-writeable
+              ls_mode = "st"
+            else
+              ls_mode = "di"
+            end
+          end
+        elsif entry.symlink?
+          dest = File.readlink(entry.path)
+          if File.exist?(dest)
+            # FIXME support "target" as a color
+            ls_mode = "ln"
+          else
+            ls_mode = "or"
+          end
+        elsif entry.executable?
+          ls_mode = "ex"
+        elsif entry.pipe?
+          ls_mode = "pi"
+        elsif entry.blockdev?
+          ls_mode = "bd"
+        elsif entry.chardev?
+          ls_mode = "cd"
+        elsif entry.socket?
+          ls_mode = "so"
+        elsif entry.file?
+          if entry.stat.mode & 04000 > 0
+            ls_mode = "su"
+          elsif entry.stat.mode & 02000 > 0
+            ls_mode = "sg"
+          else
+            parts = entry.path.split(".")
+            if parts.size > 1
+              ext = parts[-1]
+              ls_mode = "*.#{ext}"
+            end
+          end
+        end
+
+        if ls_mode
+          color = $LS_COLORS[ls_mode] || $LS_COLORS["fi"]
+          pair = Curses.COLOR_PAIR(color[:pair]) if color
+        end
+
+        if pair
+          Curses.attron(pair)
+        end
+      end
       Curses.attron(Curses::A_BOLD)  if entry.marked?
+
       Curses.addstr entry.format(width, active?)
+      if pair
+        Curses.attroff(pair)
+      end
       Curses.attroff(Curses::A_BOLD)  if entry.marked?
       Curses.standend  if j == @cur
     }
@@ -246,13 +314,41 @@ class EmptyItem
     false
   end
 
+  def symlink?
+    false
+  end
+
+  def pipe?
+    false
+  end
+
+  def executable?
+    false
+  end
+
+  def blockdev?
+    false
+  end
+
+  def chardev?
+    false
+  end
+
+  def socket?
+    false
+  end
+
+  def file?
+    false
+  end
+
   def ls_l
     "-- #@msg --"
   end
 end
 
 class FileItem
-  attr_reader :path, :name
+  attr_reader :path, :name, :lstat, :stat
 
   def initialize(path)
     @path = path
@@ -277,6 +373,34 @@ class FileItem
 
   def marked?
     $marked.include? @path
+  end
+
+  def symlink?
+    @lstat.symlink?
+  end
+
+  def directory?
+    @stat.directory?
+  end
+
+  def executable?
+    @stat.executable?
+  end
+
+  def socket?
+    @stat.socket?
+  end
+
+  def pipe?
+    @stat.pipe?
+  end
+
+  def blockdev?
+    @lstat.blockdev?
+  end
+
+  def chardev?
+    @lstat.chardev?
   end
 
   def format(width, detail)
@@ -693,6 +817,42 @@ def action(title, question, command, *args)
   c == ?y
 end
 
+def parse_ls_colors(s)
+  colors = {}
+  pairs = []
+  s.split(":").each_with_index do |definition, i|
+    name, pair = definition.split("=")
+    attr, fg = pair.split(";").map { |s| s.to_i }
+    if fg.nil?
+      n_fg = 0
+        n_bg = 0
+      bold = false
+    else
+      if fg >= 40
+        attr, fg = fg, attr
+      end
+      n_fg = fg - 30
+      n_bg = -1
+      bold = false
+      if attr == 0
+        # default
+      elsif attr == 1
+        # bold
+        bold = true
+      elsif attr >= 40
+        # background
+        n_bg = attr - 40
+        n_bg = -1 if n_bg == 0
+      end
+    end
+    arr = [n_bg, n_fg]
+    pairs << arr unless pairs.include?(arr)
+    colors[name] = { :fg => n_fg, :bg => n_bg, :bold => bold, :pair => pairs.index(arr)+1 }
+  end
+
+  [pairs, colors]
+end
+
 
 abort "no tty"  unless STDIN.tty?
 
@@ -725,6 +885,16 @@ begin
   $marked = File.read(SAVE_MARKED).split("\0")  rescue []  if SAVE_MARKED
 
   $stdscr = Curses.initscr
+  Curses.start_color
+  Curses.use_default_colors
+
+  if ENV["LS_COLORS"]
+    pairs, $LS_COLORS = parse_ls_colors(ENV["LS_COLORS"])
+    pairs.each_with_index do |(bg, fg), i|
+      Curses.init_pair(i+1, fg, bg)
+    end
+  end
+
   Curses.nonl
   Curses.cbreak
   Curses.raw
