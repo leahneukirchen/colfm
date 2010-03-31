@@ -77,6 +77,8 @@ RCFILE = File.expand_path("~/.colfmrc")
 SAVE_MARKED = File.expand_path("~/.colfmsel")
 SAVE_DIR = File.expand_path("~/.colfmdir")
 
+$colors = false
+
 $sort = 1
 $reverse = false
 
@@ -175,7 +177,7 @@ class Directory
       
       Curses.setpos(j+2-skiplines, x)
 
-      if $LS_COLORS
+      if $LS_COLORS && $colors
         pair = nil
         ls_mode = nil
 
@@ -888,7 +890,7 @@ begin
   Curses.start_color
   Curses.use_default_colors
 
-  if ENV["LS_COLORS"]
+  if ENV["LS_COLORS"] && $colors
     pairs, $LS_COLORS = parse_ls_colors(ENV["LS_COLORS"])
     pairs.each_with_index do |(bg, fg), i|
       Curses.init_pair(i+1, fg, bg)
