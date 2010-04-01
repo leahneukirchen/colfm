@@ -243,7 +243,7 @@ class Directory
       Curses.attron(Curses::A_BOLD)  if entry.marked?
 
       Curses.addstr entry.format(width, active?)
-      if pair
+      if $colors && pair
         Curses.attroff(pair)
       end
       Curses.attroff(Curses::A_BOLD)  if entry.marked?
