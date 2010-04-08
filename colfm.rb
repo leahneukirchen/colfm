@@ -62,16 +62,16 @@ $tabs = []
 
 $marked = []
 
-MIN_COL_WIDTH = 8
-MAX_COL_WIDTH = 20
-MAX_ACTIVE_COL_WIDTH = 28
-SIDEBAR_MIN_WIDTH = 20
+$min_col_width = 8
+$max_col_width = 20
+$max_active_col_width = 28
+$sidebar_min_width = 20
 
-FAVORITES = [["/", "/"],
+$favorites = [["/", "/"],
              ["~", "~"],
              ["~/Desktop", "Desktop"]]
 
-VIEWER = "less"
+$viewer = "less"
 
 RCFILE = File.expand_path("~/.colfmrc")
 SAVE_MARKED = File.expand_path("~/.colfmsel")
@@ -137,8 +137,8 @@ class Directory
   end
 
   def width
-    [[MIN_COL_WIDTH, (@entries.map { |e| e.width }.max || 0)].max,
-     active? ? MAX_ACTIVE_COL_WIDTH : MAX_COL_WIDTH].min +
+    [[$min_col_width, (@entries.map { |e| e.width }.max || 0)].max,
+     active? ? $max_active_col_width : $max_col_width].min +
       (active? ? 5 : 0)
   end
 
@@ -268,8 +268,8 @@ end
 
 class Favorites < Directory
   def refresh
-    @entries = FAVORITES.map { |path, label|
-      FavoriteItem.new(File.expand_path(path), label) 
+    @entries = $favorites.map { |path, label|
+      FavoriteItem.new(File.expand_path(path), label)
     }
   end
 end
@@ -555,7 +555,7 @@ class FileItem
       $active.parent = prev_active
     else
       Curses.endwin
-      system VIEWER, path
+      system $viewer, path
       Curses.refresh
     end
   end
@@ -621,7 +621,7 @@ end
 
 class Sidebar
   def width
-    SIDEBAR_MIN_WIDTH
+    $sidebar_min_width
   end
 
   def draw(x)
