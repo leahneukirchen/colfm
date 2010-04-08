@@ -642,7 +642,7 @@ class Sidebar
 end
 
 def sort_string
-  ($reverse ? "↓" : "↑") + SORT_NAMES[$sort]
+  ($reverse ? "↑" : "↓") + SORT_NAMES[$sort]
 end
 
 def refresh
