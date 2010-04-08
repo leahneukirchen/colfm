@@ -77,7 +77,7 @@ RCFILE = File.expand_path("~/.colfmrc")
 SAVE_MARKED = File.expand_path("~/.colfmsel")
 SAVE_DIR = File.expand_path("~/.colfmdir")
 
-$colors = false
+$colors = true
 
 $sort = 1
 $reverse = false
